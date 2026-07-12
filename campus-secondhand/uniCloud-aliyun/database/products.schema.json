@@ -1,0 +1,74 @@
+{
+	"bsonType": "object",
+	"required": ["title", "description", "price", "category", "seller_id", "seller_name", "contact", "status"],
+	"permission": {
+		"read": true,
+		"create": true,
+		"update": true,
+		"delete": false
+	},
+	"properties": {
+		"_id": {
+			"description": "商品ID"
+		},
+		"title": {
+			"bsonType": "string",
+			"title": "商品标题",
+			"trim": "both",
+			"minLength": 2,
+			"maxLength": 40
+		},
+		"description": {
+			"bsonType": "string",
+			"title": "商品描述",
+			"trim": "both",
+			"maxLength": 500
+		},
+		"price": {
+			"bsonType": "number",
+			"title": "价格",
+			"minimum": 0
+		},
+		"category": {
+			"bsonType": "string",
+			"title": "分类",
+			"enum": ["教材资料", "数码电子", "生活用品", "运动户外", "其他"]
+		},
+		"condition": {
+			"bsonType": "string",
+			"title": "成色",
+			"enum": ["全新", "九成新", "八成新", "正常使用", "有明显使用痕迹"]
+		},
+		"image_url": {
+			"bsonType": "string",
+			"title": "商品图片地址",
+			"trim": "both"
+		},
+		"seller_id": {
+			"bsonType": "string",
+			"title": "卖家ID"
+		},
+		"seller_name": {
+			"bsonType": "string",
+			"title": "卖家名称"
+		},
+		"contact": {
+			"bsonType": "string",
+			"title": "联系方式",
+			"trim": "both"
+		},
+		"status": {
+			"bsonType": "string",
+			"title": "商品状态",
+			"enum": ["在售", "已下架", "已删除"]
+		},
+		"created_at": {
+			"bsonType": "timestamp",
+			"title": "创建时间"
+		},
+		"updated_at": {
+			"bsonType": "timestamp",
+			"title": "更新时间"
+		}
+	}
+}

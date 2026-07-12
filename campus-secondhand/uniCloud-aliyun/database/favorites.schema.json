@@ -1,0 +1,27 @@
+{
+	"bsonType": "object",
+	"required": ["user_id", "product_id"],
+	"permission": {
+		"read": true,
+		"create": true,
+		"update": false,
+		"delete": true
+	},
+	"properties": {
+		"_id": {
+			"description": "收藏记录ID"
+		},
+		"user_id": {
+			"bsonType": "string",
+			"title": "用户ID"
+		},
+		"product_id": {
+			"bsonType": "string",
+			"title": "商品ID"
+		},
+		"created_at": {
+			"bsonType": "timestamp",
+			"title": "收藏时间"
+		}
+	}
+}
