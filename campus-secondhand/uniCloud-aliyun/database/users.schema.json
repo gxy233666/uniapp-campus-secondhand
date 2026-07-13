@@ -18,8 +18,21 @@
 		},
 		"phone": {
 			"bsonType": "string",
-			"title": "联系方式",
+			"title": "手机号",
 			"trim": "both"
+		},
+		"email": {
+			"bsonType": "string",
+			"title": "邮箱",
+			"trim": "both"
+		},
+		"password_hash": {
+			"bsonType": "string",
+			"title": "密码哈希"
+		},
+		"password_salt": {
+			"bsonType": "string",
+			"title": "密码盐"
 		},
 		"avatar": {
 			"bsonType": "string",
@@ -29,7 +42,10 @@
 		"created_at": {
 			"bsonType": "number",
 			"title": "创建时间"
+		},
+		"updated_at": {
+			"bsonType": "number",
+			"title": "更新时间"
 		}
 	}
 }
-

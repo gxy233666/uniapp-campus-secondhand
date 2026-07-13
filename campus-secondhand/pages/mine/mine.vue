@@ -1,11 +1,14 @@
 <template>
 	<view class="page">
 		<view class="card profile-card">
-			<view>
+			<view class="profile-info">
 				<view class="username">{{ user ? user.username : '未登录' }}</view>
-				<view class="muted">{{ user ? user.phone : '请选择模拟用户' }}</view>
+				<view class="muted">{{ user ? user.phone : '请先登录账号' }}</view>
 			</view>
-			<button class="switch-btn" @click="goLogin">切换用户</button>
+			<view class="profile-actions">
+				<button class="switch-btn" @click="goLogin">{{ user ? '切换账号' : '登录' }}</button>
+				<button v-if="user" class="logout-btn" @click="logout">退出登录</button>
+			</view>
 		</view>
 
 		<view class="tabs">
@@ -43,7 +46,7 @@
 </template>
 
 <script>
-	import { favoriteApi, getCurrentUser, productApi } from '@/common/api.js'
+	import { clearCurrentUser, favoriteApi, getCurrentUser, productApi } from '@/common/api.js'
 
 	export default {
 		data() {
@@ -61,6 +64,7 @@
 				return this.activeTab === 'products' ? this.myProducts : this.favorites
 			},
 			emptyText() {
+				if (!this.user) return '登录后查看数据'
 				return this.activeTab === 'products' ? '暂无发布商品' : '暂无收藏商品'
 			}
 		},
@@ -77,9 +81,29 @@
 			goLogin() {
 				uni.navigateTo({ url: '/pages/login/login' })
 			},
+			logout() {
+				uni.showModal({
+					title: '退出登录',
+					content: '退出后将清空当前账号状态，是否继续？',
+					success: (res) => {
+						if (!res.confirm) return
+						clearCurrentUser()
+						this.user = null
+						this.myProducts = []
+						this.favorites = []
+						this.errorMessage = ''
+						this.activeTab = 'products'
+						uni.showToast({ title: '已退出登录', icon: 'none' })
+					}
+				})
+			},
 			async loadData() {
 				this.errorMessage = ''
-				if (!this.user) return
+				if (!this.user) {
+					this.myProducts = []
+					this.favorites = []
+					return
+				}
 				this.loading = true
 				try {
 					if (this.activeTab === 'products') {
@@ -140,7 +164,20 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 20rpx;
 		margin-bottom: 22rpx;
+	}
+
+	.profile-info {
+		min-width: 0;
+		flex: 1;
+	}
+
+	.profile-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 10rpx;
+		width: 180rpx;
 	}
 
 	.username {
@@ -149,14 +186,24 @@
 		margin-bottom: 8rpx;
 	}
 
-	.switch-btn {
+	.switch-btn,
+	.logout-btn {
 		width: 180rpx;
-		height: 68rpx;
-		line-height: 68rpx;
-		font-size: 26rpx;
+		height: 64rpx;
+		line-height: 64rpx;
+		font-size: 24rpx;
+		border-radius: 10rpx;
+		padding: 0;
+	}
+
+	.switch-btn {
 		color: #1677ff;
 		background: #edf5ff;
-		border-radius: 10rpx;
+	}
+
+	.logout-btn {
+		color: #ef4444;
+		background: #fff1f2;
 	}
 
 	.tabs {
