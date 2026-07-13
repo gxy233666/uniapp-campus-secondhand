@@ -24,6 +24,9 @@
 				<input class="field" v-model="registerForm.username" placeholder="用户名，2-20 个字符" />
 				<input class="field" v-model="registerForm.phone" type="number" maxlength="11" placeholder="手机号" />
 				<input class="field" v-model="registerForm.email" placeholder="邮箱" />
+				<picker :range="schoolNames" @change="onSchoolChange">
+					<view class="field picker-field">{{ selectedSchool ? selectedSchool.name : '请选择院校' }}</view>
+				</picker>
 				<input class="field" v-model="registerForm.password" password placeholder="密码，至少 6 位且包含字母和数字" />
 				<input class="field" v-model="registerForm.confirmPassword" password placeholder="确认密码" />
 				<button class="primary-btn submit-btn" :disabled="loading" @click="submitRegister">{{ loading ? '注册中...' : '注册并登录' }}</button>
@@ -33,7 +36,7 @@
 </template>
 
 <script>
-	import { setCurrentUser, userApi } from '@/common/api.js'
+	import { schoolApi, setCurrentUser, userApi } from '@/common/api.js'
 
 	const phonePattern = /^1[3-9]\d{9}$/
 	const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -44,6 +47,8 @@
 				mode: 'login',
 				loginType: 'phone',
 				loading: false,
+				schools: [],
+				schoolIndex: -1,
 				loginForm: {
 					phone: '',
 					email: '',
@@ -58,12 +63,35 @@
 				}
 			}
 		},
+		computed: {
+			schoolNames() {
+				return this.schools.map(item => `${item.name}（${item.province}）`)
+			},
+			selectedSchool() {
+				return this.schoolIndex >= 0 ? this.schools[this.schoolIndex] : null
+			}
+		},
+		onLoad() {
+			this.loadSchools()
+		},
 		methods: {
+			async loadSchools() {
+				try {
+					const res = await schoolApi.list()
+					if (res.code !== 0) throw new Error(res.message || '院校加载失败')
+					this.schools = res.data || []
+				} catch (error) {
+					uni.showToast({ title: error.message || '院校加载失败', icon: 'none' })
+				}
+			},
 			switchMode(mode) {
 				this.mode = mode
 			},
 			switchLoginType(type) {
 				this.loginType = type
+			},
+			onSchoolChange(event) {
+				this.schoolIndex = Number(event.detail.value)
 			},
 			showMessage(message) {
 				uni.showToast({ title: message, icon: 'none' })
@@ -90,6 +118,7 @@
 				if (username.length < 2 || username.length > 20) return '用户名需为 2-20 个字符'
 				if (!phonePattern.test(phone)) return '手机号格式不正确'
 				if (!emailPattern.test(email)) return '邮箱格式不正确'
+				if (!this.selectedSchool) return '请选择院校'
 				if (!this.validatePassword(form.password)) return '密码至少 6 位，且需包含字母和数字'
 				if (form.password !== form.confirmPassword) return '两次输入的密码不一致'
 				return ''
@@ -126,7 +155,8 @@
 						username: form.username.trim(),
 						phone: form.phone.trim(),
 						email: form.email.trim(),
-						password: form.password
+						password: form.password,
+						school_id: this.selectedSchool.school_id
 					})
 					if (res.code !== 0) throw new Error(res.message || '注册失败')
 					setCurrentUser(res.data)
@@ -215,6 +245,10 @@
 		padding: 0 22rpx;
 		margin-bottom: 18rpx;
 		box-sizing: border-box;
+	}
+
+	.picker-field {
+		color: #4b5563;
 	}
 
 	.submit-btn {

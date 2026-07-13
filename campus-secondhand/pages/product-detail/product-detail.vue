@@ -1,4 +1,4 @@
-﻿<template>
+<template>
 	<view class="page">
 		<view v-if="loading" class="empty">商品加载中...</view>
 		<view v-else-if="errorMessage" class="empty error-text">{{ errorMessage }}</view>
@@ -8,6 +8,7 @@
 				<view class="title">{{ product.title }}</view>
 				<view class="price">￥{{ product.price }}</view>
 				<view class="meta">
+					<text>{{ product.school_name || '未标注院校' }}</text>
 					<text>{{ product.category }}</text>
 					<text>{{ product.condition }}</text>
 					<text>{{ product.status }}</text>

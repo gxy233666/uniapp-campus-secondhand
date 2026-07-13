@@ -2,12 +2,48 @@ const crypto = require('crypto')
 const db = uniCloud.database()
 const users = db.collection('users')
 
+const allowedSchools = [
+	{ school_id: 'fj_xiamen_university', name: '厦门大学' },
+	{ school_id: 'fj_fuzhou_university', name: '福州大学' },
+	{ school_id: 'fj_fujian_normal_university', name: '福建师范大学' },
+	{ school_id: 'fj_fujian_agriculture_forestry_university', name: '福建农林大学' },
+	{ school_id: 'fj_huaqiao_university', name: '华侨大学' },
+	{ school_id: 'fj_jimei_university', name: '集美大学' },
+	{ school_id: 'fj_fujian_medical_university', name: '福建医科大学' },
+	{ school_id: 'fj_fujian_university_tcm', name: '福建中医药大学' },
+	{ school_id: 'fj_minnan_normal_university', name: '闽南师范大学' },
+	{ school_id: 'fj_fujian_university_technology', name: '福建理工大学' },
+	{ school_id: 'fj_xiamen_university_technology', name: '厦门理工学院' },
+	{ school_id: 'fj_minjiang_university', name: '闽江学院' },
+	{ school_id: 'fj_quanzhou_normal_university', name: '泉州师范学院' },
+	{ school_id: 'fj_putian_university', name: '莆田学院' },
+	{ school_id: 'fj_sanming_university', name: '三明学院' },
+	{ school_id: 'fj_longyan_university', name: '龙岩学院' },
+	{ school_id: 'fj_wuyi_university', name: '武夷学院' },
+	{ school_id: 'fj_ningde_normal_university', name: '宁德师范学院' },
+	{ school_id: 'fj_xiamen_medical_college', name: '厦门医学院' },
+	{ school_id: 'fj_fujian_jiangxia_university', name: '福建江夏学院' },
+	{ school_id: 'fj_fujian_police_college', name: '福建警察学院' },
+	{ school_id: 'fj_minnan_science_technology_university', name: '闽南科技学院' },
+	{ school_id: 'fj_yang_en_university', name: '仰恩大学' },
+	{ school_id: 'fj_minnan_university_technology', name: '闽南理工学院' },
+	{ school_id: 'fj_fuzhou_business_college', name: '福州工商学院' },
+	{ school_id: 'fj_fuzhou_university_international_studies_trade', name: '福州外语外贸学院' },
+	{ school_id: 'fj_xiamen_institute_technology', name: '厦门工学院' },
+	{ school_id: 'fj_quanzhou_information_engineering', name: '泉州信息工程学院' },
+	{ school_id: 'ln_shenyang_agricultural_university', name: '沈阳农业大学' },
+	{ school_id: 'bj_tsinghua_university', name: '清华大学' },
+	{ school_id: 'bj_peking_university', name: '北京大学' }
+]
+
 const demoUsers = [
 	{
 		_id: 'demo-user-1',
 		username: '张三',
 		phone: '13800000001',
 		email: 'zhangsan@example.com',
+		school_id: 'fj_minnan_science_technology_university',
+		school_name: '闽南科技学院',
 		avatar: '',
 		created_at: Date.now()
 	},
@@ -16,6 +52,8 @@ const demoUsers = [
 		username: '李四',
 		phone: '13800000002',
 		email: 'lisi@example.com',
+		school_id: 'fj_xiamen_university',
+		school_name: '厦门大学',
 		avatar: '',
 		created_at: Date.now()
 	},
@@ -24,6 +62,8 @@ const demoUsers = [
 		username: '王五',
 		phone: '13800000003',
 		email: 'wangwu@example.com',
+		school_id: 'bj_tsinghua_university',
+		school_name: '清华大学',
 		avatar: '',
 		created_at: Date.now()
 	}
@@ -54,15 +94,22 @@ function isValidPassword(password) {
 	return value.length >= 6 && /[A-Za-z]/.test(value) && /\d/.test(value)
 }
 
+function getAllowedSchool(schoolId) {
+	return allowedSchools.find(item => item.school_id === schoolId)
+}
+
 function validateRegisterData(data = {}) {
 	const username = String(data.username || '').trim()
 	const phone = String(data.phone || '').trim()
 	const email = String(data.email || '').trim().toLowerCase()
 	const password = String(data.password || '')
+	const schoolId = String(data.school_id || '').trim()
+	const school = getAllowedSchool(schoolId)
 	if (username.length < 2 || username.length > 20) return '用户名需为 2-20 个字符'
 	if (!isValidPhone(phone)) return '手机号格式不正确'
 	if (!isValidEmail(email)) return '邮箱格式不正确'
 	if (!isValidPassword(password)) return '密码至少 6 位，且需包含字母和数字'
+	if (!school) return '请选择有效院校'
 	return ''
 }
 
@@ -149,6 +196,7 @@ module.exports = {
 		const username = String(data.username).trim()
 		const phone = String(data.phone).trim()
 		const email = String(data.email).trim().toLowerCase()
+		const school = getAllowedSchool(String(data.school_id).trim())
 		try {
 			const existedPhone = await findByPhone(phone)
 			if (existedPhone) return fail('该手机号已注册', 409)
@@ -160,6 +208,8 @@ module.exports = {
 				username,
 				phone,
 				email,
+				school_id: school.school_id,
+				school_name: school.name,
 				avatar: '',
 				...passwordRecord,
 				created_at: now,

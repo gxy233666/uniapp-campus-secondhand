@@ -1,6 +1,7 @@
 const productObject = uniCloud.importObject('product')
 const favoriteObject = uniCloud.importObject('favorite')
 const userObject = uniCloud.importObject('user')
+const schoolObject = uniCloud.importObject('school')
 
 export function getCurrentUser() {
 	return uni.getStorageSync('currentUser') || null
@@ -12,6 +13,12 @@ export function setCurrentUser(user) {
 
 export function clearCurrentUser() {
 	uni.removeStorageSync('currentUser')
+}
+
+export const schoolApi = {
+	list() {
+		return schoolObject.list()
+	}
 }
 
 export const userApi = {

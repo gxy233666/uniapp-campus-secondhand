@@ -1,6 +1,6 @@
 {
 	"bsonType": "object",
-	"required": ["username", "phone"],
+	"required": ["school_id", "name", "province", "city"],
 	"permission": {
 		"read": true,
 		"create": true,
@@ -9,44 +9,31 @@
 	},
 	"properties": {
 		"_id": {
-			"description": "用户ID"
-		},
-		"username": {
-			"bsonType": "string",
-			"title": "用户名",
-			"trim": "both"
-		},
-		"phone": {
-			"bsonType": "string",
-			"title": "手机号",
-			"trim": "both"
-		},
-		"email": {
-			"bsonType": "string",
-			"title": "邮箱",
-			"trim": "both"
+			"description": "记录ID"
 		},
 		"school_id": {
 			"bsonType": "string",
 			"title": "院校标识",
 			"trim": "both"
 		},
-		"school_name": {
+		"name": {
 			"bsonType": "string",
 			"title": "院校名称",
 			"trim": "both"
 		},
-		"password_hash": {
+		"province": {
 			"bsonType": "string",
-			"title": "密码哈希"
+			"title": "省份",
+			"trim": "both"
 		},
-		"password_salt": {
+		"city": {
 			"bsonType": "string",
-			"title": "密码盐"
+			"title": "城市",
+			"trim": "both"
 		},
-		"avatar": {
+		"level": {
 			"bsonType": "string",
-			"title": "头像地址",
+			"title": "办学层次",
 			"trim": "both"
 		},
 		"created_at": {

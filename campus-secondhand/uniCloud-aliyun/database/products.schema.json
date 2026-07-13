@@ -44,6 +44,16 @@
 			"title": "商品图片地址",
 			"trim": "both"
 		},
+		"school_id": {
+			"bsonType": "string",
+			"title": "院校标识",
+			"trim": "both"
+		},
+		"school_name": {
+			"bsonType": "string",
+			"title": "院校名称",
+			"trim": "both"
+		},
 		"seller_id": {
 			"bsonType": "string",
 			"title": "卖家ID"
@@ -72,4 +82,3 @@
 		}
 	}
 }
-

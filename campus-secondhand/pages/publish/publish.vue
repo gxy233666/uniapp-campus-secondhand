@@ -2,6 +2,7 @@
 	<view class="page">
 		<view class="card form-card">
 			<view class="form-title">发布闲置商品</view>
+			<view class="school-field">{{ userSchoolText }}</view>
 			<input class="field" v-model="form.title" placeholder="商品标题" />
 			<textarea class="textarea" v-model="form.description" placeholder="商品描述，例如购买时间、使用情况、交易地点"></textarea>
 			<input class="field" v-model="form.price" type="digit" placeholder="价格" />
@@ -37,6 +38,15 @@
 				}
 			}
 		},
+		computed: {
+			currentUser() {
+				return getCurrentUser()
+			},
+			userSchoolText() {
+				if (!this.currentUser) return '请先登录账号后发布商品'
+				return this.currentUser.school_name ? `发布院校：${this.currentUser.school_name}` : '当前账号未选择院校，请重新注册或切换账号'
+			}
+		},
 		methods: {
 			onCategoryChange(event) {
 				this.form.category = this.categories[event.detail.value]
@@ -58,10 +68,16 @@
 					uni.navigateTo({ url: '/pages/login/login' })
 					return
 				}
+				if (!user.school_id || !user.school_name) {
+					uni.showModal({ title: '无法发布', content: '当前账号没有院校信息，请注册新账号或切换到已选择院校的账号。', showCancel: false })
+					return
+				}
 				try {
 					const res = await productApi.add({
 						...this.form,
 						price: Number(this.form.price),
+						school_id: user.school_id,
+						school_name: user.school_name,
 						seller_id: user._id,
 						seller_name: user.username
 					})
@@ -95,7 +111,16 @@
 	.form-title {
 		font-size: 36rpx;
 		font-weight: 700;
-		margin-bottom: 24rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.school-field {
+		background: #edf5ff;
+		color: #1677ff;
+		border-radius: 10rpx;
+		padding: 18rpx 22rpx;
+		margin-bottom: 18rpx;
+		font-size: 26rpx;
 	}
 
 	.field,
@@ -129,4 +154,3 @@
 		line-height: 86rpx;
 	}
 </style>
-

@@ -1,9 +1,13 @@
-﻿<template>
+<template>
 	<view class="page">
 		<view class="search-row">
 			<input class="search-input" v-model="keyword" placeholder="搜索教材、数码、生活用品" confirm-type="search" @confirm="loadProducts" />
 			<button class="search-btn" @click="loadProducts">搜索</button>
 		</view>
+
+		<picker :range="schoolNames" @change="onSchoolChange">
+			<view class="school-picker">{{ selectedSchoolName }}</view>
+		</picker>
 
 		<scroll-view class="category-scroll" scroll-x>
 			<view
@@ -34,7 +38,7 @@
 						<text class="price">￥{{ item.price }}</text>
 						<text class="tag">{{ item.category }}</text>
 					</view>
-					<view class="seller">{{ item.seller_name }} · {{ item.condition }}</view>
+					<view class="seller">{{ item.school_name || '未标注院校' }} · {{ item.seller_name }} · {{ item.condition }}</view>
 				</view>
 			</view>
 		</view>
@@ -42,7 +46,7 @@
 </template>
 
 <script>
-	import { productApi } from '@/common/api.js'
+	import { productApi, schoolApi } from '@/common/api.js'
 
 	export default {
 		data() {
@@ -50,6 +54,8 @@
 				keyword: '',
 				category: '全部',
 				categories: ['全部', '教材资料', '数码电子', '生活用品', '运动户外', '其他'],
+				schools: [],
+				schoolIndex: 0,
 				products: [],
 				loading: false,
 				errorMessage: '',
@@ -57,24 +63,46 @@
 			}
 		},
 		computed: {
+			schoolNames() {
+				return ['全部院校', ...this.schools.map(item => item.name)]
+			},
+			selectedSchool() {
+				return this.schoolIndex > 0 ? this.schools[this.schoolIndex - 1] : null
+			},
+			selectedSchoolName() {
+				return this.selectedSchool ? this.selectedSchool.name : '全部院校'
+			},
 			hasFilter() {
-				return !!this.keyword.trim() || this.category !== '全部'
+				return !!this.keyword.trim() || this.category !== '全部' || this.schoolIndex > 0
 			},
 			emptyText() {
 				return this.hasFilter ? '没有找到符合条件的商品' : '暂无商品，去发布第一件闲置吧'
 			}
 		},
+		onLoad() {
+			this.loadSchools()
+		},
 		onShow() {
 			this.loadProducts()
 		},
 		methods: {
+			async loadSchools() {
+				try {
+					const res = await schoolApi.list()
+					if (res.code !== 0) throw new Error(res.message || '院校加载失败')
+					this.schools = res.data || []
+				} catch (error) {
+					uni.showToast({ title: error.message || '院校加载失败', icon: 'none' })
+				}
+			},
 			async loadProducts() {
 				this.loading = true
 				this.errorMessage = ''
 				try {
 					const res = await productApi.list({
 						keyword: this.keyword.trim(),
-						category: this.category === '全部' ? '' : this.category
+						category: this.category === '全部' ? '' : this.category,
+						school_id: this.selectedSchool ? this.selectedSchool.school_id : ''
 					})
 					if (res.code !== 0) throw new Error(res.message || '商品加载失败')
 					this.products = res.data || []
@@ -86,6 +114,10 @@
 					this.loading = false
 				}
 			},
+			onSchoolChange(event) {
+				this.schoolIndex = Number(event.detail.value)
+				this.loadProducts()
+			},
 			selectCategory(item) {
 				if (this.category === item) return
 				this.category = item
@@ -94,6 +126,7 @@
 			clearFilter() {
 				this.keyword = ''
 				this.category = '全部'
+				this.schoolIndex = 0
 				this.loadProducts()
 			},
 			goDetail(id) {
@@ -107,7 +140,7 @@
 	.search-row {
 		display: flex;
 		gap: 16rpx;
-		margin-bottom: 20rpx;
+		margin-bottom: 18rpx;
 	}
 
 	.search-input {
@@ -127,6 +160,17 @@
 		color: #ffffff;
 		border-radius: 10rpx;
 		font-size: 28rpx;
+	}
+
+	.school-picker {
+		height: 76rpx;
+		line-height: 76rpx;
+		padding: 0 24rpx;
+		margin-bottom: 18rpx;
+		background: #ffffff;
+		border-radius: 10rpx;
+		color: #111827;
+		box-sizing: border-box;
 	}
 
 	.category-scroll {

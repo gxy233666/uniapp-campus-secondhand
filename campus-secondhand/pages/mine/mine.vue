@@ -4,6 +4,7 @@
 			<view class="profile-info">
 				<view class="username">{{ user ? user.username : '未登录' }}</view>
 				<view class="muted">{{ user ? user.phone : '请先登录账号' }}</view>
+				<view v-if="user && user.school_name" class="school-name">{{ user.school_name }}</view>
 			</view>
 			<view class="profile-actions">
 				<button class="switch-btn" @click="goLogin">{{ user ? '切换账号' : '登录' }}</button>
@@ -29,7 +30,7 @@
 			>
 				<view class="product-main">
 					<view class="product-title">{{ item.title }}</view>
-					<view class="muted">{{ item.category }} · {{ item.condition }}</view>
+					<view class="muted">{{ item.school_name || '未标注院校' }} · {{ item.category }} · {{ item.condition }}</view>
 					<view class="status-line">
 						<text class="price">￥{{ item.price }}</text>
 						<text v-if="activeTab === 'products'" class="status-tag" :class="{ offline: item.status !== '在售' }">{{ item.status }}</text>
@@ -184,6 +185,12 @@
 		font-size: 36rpx;
 		font-weight: 700;
 		margin-bottom: 8rpx;
+	}
+
+	.school-name {
+		margin-top: 8rpx;
+		color: #1677ff;
+		font-size: 24rpx;
 	}
 
 	.switch-btn,

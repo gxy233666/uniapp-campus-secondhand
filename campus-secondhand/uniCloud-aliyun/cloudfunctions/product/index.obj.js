@@ -11,6 +11,8 @@ const demoProducts = [
 		category: '教材资料',
 		condition: '八成新',
 		image_url: '',
+		school_id: 'fj_minnan_science_technology_university',
+		school_name: '闽南科技学院',
 		seller_id: 'demo-user-1',
 		seller_name: '张三',
 		contact: '13800000001',
@@ -26,6 +28,8 @@ const demoProducts = [
 		category: '数码电子',
 		condition: '正常使用',
 		image_url: '',
+		school_id: 'fj_xiamen_university',
+		school_name: '厦门大学',
 		seller_id: 'demo-user-2',
 		seller_name: '李四',
 		contact: '13800000002',
@@ -41,6 +45,8 @@ const demoProducts = [
 		category: '生活用品',
 		condition: '九成新',
 		image_url: '',
+		school_id: 'bj_tsinghua_university',
+		school_name: '清华大学',
 		seller_id: 'demo-user-3',
 		seller_name: '王五',
 		contact: '13800000003',
@@ -83,14 +89,17 @@ async function ensureDemoProducts() {
 function filterProducts(list, params = {}) {
 	const keyword = (params.keyword || '').trim().toLowerCase()
 	const category = (params.category || '').trim()
+	const schoolId = (params.school_id || '').trim()
 	return list.filter(item => {
 		const matchedStatus = item.status === '在售'
 		const matchedCategory = !category || item.category === category
+		const matchedSchool = !schoolId || item.school_id === schoolId
 		const matchedKeyword = !keyword ||
 			String(item.title || '').toLowerCase().includes(keyword) ||
 			String(item.description || '').toLowerCase().includes(keyword) ||
-			String(item.seller_name || '').toLowerCase().includes(keyword)
-		return matchedStatus && matchedCategory && matchedKeyword
+			String(item.seller_name || '').toLowerCase().includes(keyword) ||
+			String(item.school_name || '').toLowerCase().includes(keyword)
+		return matchedStatus && matchedCategory && matchedSchool && matchedKeyword
 	})
 }
 
@@ -106,11 +115,13 @@ function sortMyProducts(list) {
 		return (right.updated_at || right.created_at || 0) - (left.updated_at || left.created_at || 0)
 	})
 }
+
 function validateProductData(data, partial = false) {
 	const requiredFields = ['title', 'description', 'price', 'category', 'seller_id', 'seller_name', 'contact']
 	if (!partial) {
 		const missing = requiredFields.find(field => data[field] === undefined || data[field] === '')
 		if (missing) return `${missing} is required`
+		if (!data.school_id || !data.school_name) return 'school is required'
 	}
 	if (data.price !== undefined) {
 		const price = Number(data.price)
@@ -130,6 +141,8 @@ function buildCreatePayload(data) {
 		category: data.category,
 		condition: data.condition || '正常使用',
 		image_url: data.image_url || '',
+		school_id: data.school_id,
+		school_name: data.school_name,
 		seller_id: data.seller_id,
 		seller_name: data.seller_name,
 		contact: data.contact,
@@ -264,6 +277,8 @@ module.exports = {
 				price: 0,
 				category: '其他',
 				condition: '正常使用',
+				school_id: 'system',
+				school_name: '系统测试',
 				seller_id: 'system',
 				seller_name: '系统测试',
 				contact: 'none',
