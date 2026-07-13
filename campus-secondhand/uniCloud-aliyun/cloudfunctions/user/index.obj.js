@@ -26,8 +26,12 @@ const demoUsers = [
 ]
 
 async function ensureDemoUsers() {
-	const countRes = await users.count()
-	if (countRes.total > 0) return
+	try {
+		const countRes = await users.count()
+		if (countRes.total > 0) return
+	} catch (error) {
+		// The collection may not exist on a fresh uniCloud space. Adding documents creates it.
+	}
 	for (const item of demoUsers) {
 		await users.add(item)
 	}
@@ -78,3 +82,4 @@ module.exports = {
 		}
 	}
 }
+

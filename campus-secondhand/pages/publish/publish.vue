@@ -59,12 +59,15 @@
 					return
 				}
 				try {
-					await productApi.add({
+					const res = await productApi.add({
 						...this.form,
 						price: Number(this.form.price),
 						seller_id: user._id,
 						seller_name: user.username
 					})
+					if (res.code !== 0) {
+						throw new Error(res.message || '发布失败')
+					}
 					uni.showToast({ title: '发布成功', icon: 'success' })
 					this.form = {
 						title: '',
@@ -77,7 +80,7 @@
 					}
 					setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 600)
 				} catch (error) {
-					uni.showToast({ title: '发布失败', icon: 'none' })
+					uni.showModal({ title: '发布失败', content: error.message || '发布失败', showCancel: false })
 				}
 			}
 		}
@@ -126,3 +129,4 @@
 		line-height: 86rpx;
 	}
 </style>
+

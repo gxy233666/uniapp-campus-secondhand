@@ -15,7 +15,8 @@ const demoProducts = [
 		seller_name: '张三',
 		contact: '13800000001',
 		status: '在售',
-		created_at: Date.now() - 300000
+		created_at: Date.now() - 300000,
+		updated_at: Date.now() - 300000
 	},
 	{
 		_id: 'demo-product-2',
@@ -29,7 +30,8 @@ const demoProducts = [
 		seller_name: '李四',
 		contact: '13800000002',
 		status: '在售',
-		created_at: Date.now() - 200000
+		created_at: Date.now() - 200000,
+		updated_at: Date.now() - 200000
 	},
 	{
 		_id: 'demo-product-3',
@@ -43,9 +45,26 @@ const demoProducts = [
 		seller_name: '王五',
 		contact: '13800000003',
 		status: '在售',
-		created_at: Date.now() - 100000
+		created_at: Date.now() - 100000,
+		updated_at: Date.now() - 100000
 	}
 ]
+
+function ok(data, message = 'ok') {
+	return { code: 0, message, data }
+}
+
+function fail(message, code = 500) {
+	return { code, message, data: null }
+}
+
+function normalizeError(error) {
+	return error && error.message ? error.message : String(error)
+}
+
+function databaseSetupMessage(error) {
+	return `数据库集合 products 不可用，请先在 uniCloud 控制台手动创建 products 集合后重试。原始错误：${normalizeError(error)}`
+}
 
 async function ensureDemoProducts() {
 	const countRes = await products.count()
@@ -75,59 +94,37 @@ module.exports = {
 		try {
 			await ensureDemoProducts()
 			const res = await products.orderBy('created_at', 'desc').get()
-			return {
-				code: 0,
-				message: 'ok',
-				data: filterProducts(res.data, params)
-			}
+			return ok(filterProducts(res.data, params))
 		} catch (error) {
-			return {
-				code: 0,
-				message: 'fallback demo products',
-				data: filterProducts(demoProducts, params)
-			}
+			return ok(filterProducts(demoProducts, params), `使用演示商品数据：${databaseSetupMessage(error)}`)
 		}
 	},
 
 	async detail(id) {
-		if (!id) {
-			return {
-				code: 400,
-				message: 'id is required',
-				data: null
-			}
-		}
+		if (!id) return fail('id is required', 400)
 		try {
 			const res = await products.doc(id).get()
-			return {
-				code: res.data.length ? 0 : 404,
-				message: res.data.length ? 'ok' : 'product not found',
-				data: res.data[0] || null
-			}
+			if (!res.data.length) return fail('product not found', 404)
+			return ok(res.data[0])
 		} catch (error) {
-			const product = demoProducts.find(item => item._id === id)
-			return {
-				code: product ? 0 : 404,
-				message: product ? 'fallback demo product' : 'product not found',
-				data: product || null
-			}
+			const demo = demoProducts.find(item => item._id === id)
+			if (demo) return ok(demo, `使用演示商品详情：${databaseSetupMessage(error)}`)
+			return fail(`商品详情读取失败：${databaseSetupMessage(error)}`)
 		}
 	},
 
 	async add(data = {}) {
 		const requiredFields = ['title', 'description', 'price', 'category', 'seller_id', 'seller_name', 'contact']
 		const missing = requiredFields.find(field => data[field] === undefined || data[field] === '')
-		if (missing) {
-			return {
-				code: 400,
-				message: `${missing} is required`,
-				data: null
-			}
-		}
+		if (missing) return fail(`${missing} is required`, 400)
+
+		const price = Number(data.price)
+		if (Number.isNaN(price) || price < 0) return fail('price is invalid', 400)
+
 		const payload = {
 			title: String(data.title).trim(),
 			description: String(data.description).trim(),
-			price: Number(data.price),
+			price,
 			category: data.category,
 			condition: data.condition || '正常使用',
 			image_url: data.image_url || '',
@@ -138,45 +135,22 @@ module.exports = {
 			created_at: Date.now(),
 			updated_at: Date.now()
 		}
+
 		try {
 			const res = await products.add(payload)
-			return {
-				code: 0,
-				message: 'created',
-				data: {
-					_id: res.id,
-					...payload
-				}
-			}
+			return ok({ _id: res.id, ...payload }, 'created')
 		} catch (error) {
-			return {
-				code: 0,
-				message: 'created in fallback mode',
-				data: {
-					_id: `local-${Date.now()}`,
-					...payload
-				}
-			}
+			return fail(`商品保存失败：${databaseSetupMessage(error)}`)
 		}
 	},
 
 	async update(id, data = {}) {
-		if (!id || !data.seller_id) {
-			return {
-				code: 400,
-				message: 'id and seller_id are required',
-				data: null
-			}
-		}
+		if (!id || !data.seller_id) return fail('id and seller_id are required', 400)
 		try {
 			const current = await products.doc(id).get()
 			const product = current.data[0]
 			if (!product || product.seller_id !== data.seller_id) {
-				return {
-					code: 403,
-					message: 'only seller can update this product',
-					data: null
-				}
+				return fail('only seller can update this product', 403)
 			}
 			const allowFields = ['title', 'description', 'price', 'category', 'condition', 'image_url', 'contact', 'status']
 			const payload = {}
@@ -185,85 +159,78 @@ module.exports = {
 			})
 			payload.updated_at = Date.now()
 			await products.doc(id).update(payload)
-			return {
-				code: 0,
-				message: 'updated',
-				data: {
-					_id: id,
-					...payload
-				}
-			}
+			return ok({ _id: id, ...payload }, 'updated')
 		} catch (error) {
-			return {
-				code: 503,
-				message: 'database is not ready',
-				data: null
-			}
+			return fail(`商品更新失败：${databaseSetupMessage(error)}`)
 		}
 	},
 
 	async remove(id, userId) {
-		if (!id || !userId) {
-			return {
-				code: 400,
-				message: 'id and userId are required',
-				data: null
-			}
-		}
+		if (!id || !userId) return fail('id and userId are required', 400)
 		try {
 			const current = await products.doc(id).get()
 			const product = current.data[0]
 			if (!product || product.seller_id !== userId) {
-				return {
-					code: 403,
-					message: 'only seller can remove this product',
-					data: null
-				}
+				return fail('only seller can remove this product', 403)
 			}
 			await products.doc(id).update({
 				status: '已下架',
 				updated_at: Date.now()
 			})
-			return {
-				code: 0,
-				message: 'removed',
-				data: {
-					_id: id
-				}
-			}
+			return ok({ _id: id }, 'removed')
 		} catch (error) {
-			return {
-				code: 503,
-				message: 'database is not ready',
-				data: null
-			}
+			return fail(`商品下架失败：${databaseSetupMessage(error)}`)
 		}
 	},
 
 	async myList(userId) {
-		if (!userId) {
-			return {
-				code: 400,
-				message: 'userId is required',
-				data: []
-			}
-		}
+		if (!userId) return fail('userId is required', 400)
 		try {
 			const res = await products.where({
 				seller_id: userId,
 				status: dbCmd.neq('已删除')
 			}).orderBy('created_at', 'desc').get()
-			return {
-				code: 0,
-				message: 'ok',
-				data: res.data
-			}
+			return ok(res.data)
 		} catch (error) {
-			return {
-				code: 0,
-				message: 'fallback demo products',
-				data: demoProducts.filter(item => item.seller_id === userId)
-			}
+			return fail(`我的发布读取失败：${databaseSetupMessage(error)}`)
 		}
+	},
+
+	async health() {
+		const result = {
+			count: null,
+			add: null,
+			get: null
+		}
+		try {
+			result.count = await products.count()
+		} catch (error) {
+			result.count = normalizeError(error)
+		}
+		try {
+			const payload = {
+				title: '数据库连通性测试',
+				description: '这条记录用于测试 products 集合是否可写，可手动删除。',
+				price: 0,
+				category: '其他',
+				condition: '正常使用',
+				image_url: '',
+				seller_id: 'system',
+				seller_name: '系统测试',
+				contact: 'none',
+				status: '已删除',
+				created_at: Date.now(),
+				updated_at: Date.now()
+			}
+			result.add = await products.add(payload)
+		} catch (error) {
+			result.add = normalizeError(error)
+		}
+		try {
+			result.get = await products.limit(1).get()
+		} catch (error) {
+			result.get = normalizeError(error)
+		}
+		return ok(result)
 	}
 }

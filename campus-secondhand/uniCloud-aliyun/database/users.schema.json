@@ -27,8 +27,9 @@
 			"trim": "both"
 		},
 		"created_at": {
-			"bsonType": "timestamp",
+			"bsonType": "number",
 			"title": "创建时间"
 		}
 	}
 }
+

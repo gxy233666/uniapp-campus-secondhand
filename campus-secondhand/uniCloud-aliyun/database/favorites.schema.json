@@ -20,8 +20,9 @@
 			"title": "商品ID"
 		},
 		"created_at": {
-			"bsonType": "timestamp",
+			"bsonType": "number",
 			"title": "收藏时间"
 		}
 	}
 }
+

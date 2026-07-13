@@ -22,7 +22,7 @@
 					<view class="muted">{{ item.category }} · {{ item.condition }}</view>
 					<view class="price">￥{{ item.price }}</view>
 				</view>
-				<button v-if="activeTab === 'products'" class="remove-btn" @click.stop="removeProduct(item._id)">删除</button>
+				<button v-if="activeTab === 'products'" class="remove-btn" @click.stop="removeProduct(item._id)">下架</button>
 			</view>
 		</view>
 	</view>
@@ -65,13 +65,19 @@
 				try {
 					if (this.activeTab === 'products') {
 						const res = await productApi.myList(this.user._id)
+						if (res.code !== 0) {
+							throw new Error(res.message || '我的发布加载失败')
+						}
 						this.myProducts = res.data || []
 					} else {
 						const res = await favoriteApi.list(this.user._id)
+						if (res.code !== 0) {
+							throw new Error(res.message || '我的收藏加载失败')
+						}
 						this.favorites = res.data || []
 					}
 				} catch (error) {
-					uni.showToast({ title: '数据加载失败', icon: 'none' })
+					uni.showToast({ title: error.message || '数据加载失败', icon: 'none' })
 				} finally {
 					this.loading = false
 				}
@@ -81,11 +87,14 @@
 			},
 			async removeProduct(id) {
 				try {
-					await productApi.remove(id, this.user._id)
-					uni.showToast({ title: '已删除', icon: 'none' })
+					const res = await productApi.remove(id, this.user._id)
+					if (res.code !== 0) {
+						throw new Error(res.message || '下架失败')
+					}
+					uni.showToast({ title: '已下架', icon: 'none' })
 					this.loadData()
 				} catch (error) {
-					uni.showToast({ title: '删除失败', icon: 'none' })
+					uni.showToast({ title: error.message || '下架失败', icon: 'none' })
 				}
 			}
 		}

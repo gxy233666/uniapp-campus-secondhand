@@ -62,9 +62,12 @@
 						keyword: this.keyword,
 						category: this.category === '全部' ? '' : this.category
 					})
+					if (res.code !== 0) {
+						throw new Error(res.message || '商品加载失败')
+					}
 					this.products = res.data || []
 				} catch (error) {
-					uni.showToast({ title: '商品加载失败', icon: 'none' })
+					uni.showToast({ title: error.message || '商品加载失败', icon: 'none' })
 				} finally {
 					this.loading = false
 				}
@@ -203,3 +206,4 @@
 		font-size: 24rpx;
 	}
 </style>
+

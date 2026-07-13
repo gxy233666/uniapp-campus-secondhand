@@ -63,12 +63,13 @@
 			"enum": ["在售", "已下架", "已删除"]
 		},
 		"created_at": {
-			"bsonType": "timestamp",
+			"bsonType": "number",
 			"title": "创建时间"
 		},
 		"updated_at": {
-			"bsonType": "timestamp",
+			"bsonType": "number",
 			"title": "更新时间"
 		}
 	}
 }
+
