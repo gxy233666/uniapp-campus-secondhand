@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view class="page">
 		<view class="search-row">
 			<input class="search-input" v-model="keyword" placeholder="搜索教材、数码、生活用品" confirm-type="search" @confirm="loadProducts" />
@@ -15,10 +15,14 @@
 			>{{ item }}</view>
 		</scroll-view>
 
-		<view class="section-title">最新闲置</view>
+		<view class="section-head">
+			<view class="section-title">最新闲置</view>
+			<view v-if="hasFilter" class="clear-filter" @click="clearFilter">清空筛选</view>
+		</view>
 
 		<view v-if="loading" class="empty">加载中...</view>
-		<view v-else-if="products.length === 0" class="empty">暂无商品，去发布第一件闲置吧</view>
+		<view v-else-if="errorMessage" class="empty error-text">{{ errorMessage }}</view>
+		<view v-else-if="products.length === 0" class="empty">{{ emptyText }}</view>
 
 		<view v-else class="product-list">
 			<view v-for="item in products" :key="item._id" class="product-card" @click="goDetail(item._id)">
@@ -48,7 +52,16 @@
 				categories: ['全部', '教材资料', '数码电子', '生活用品', '运动户外', '其他'],
 				products: [],
 				loading: false,
+				errorMessage: '',
 				defaultImage: 'https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/uni@2x.png'
+			}
+		},
+		computed: {
+			hasFilter() {
+				return !!this.keyword.trim() || this.category !== '全部'
+			},
+			emptyText() {
+				return this.hasFilter ? '没有找到符合条件的商品' : '暂无商品，去发布第一件闲置吧'
 			}
 		},
 		onShow() {
@@ -57,23 +70,30 @@
 		methods: {
 			async loadProducts() {
 				this.loading = true
+				this.errorMessage = ''
 				try {
 					const res = await productApi.list({
-						keyword: this.keyword,
+						keyword: this.keyword.trim(),
 						category: this.category === '全部' ? '' : this.category
 					})
-					if (res.code !== 0) {
-						throw new Error(res.message || '商品加载失败')
-					}
+					if (res.code !== 0) throw new Error(res.message || '商品加载失败')
 					this.products = res.data || []
 				} catch (error) {
-					uni.showToast({ title: error.message || '商品加载失败', icon: 'none' })
+					this.products = []
+					this.errorMessage = error.message || '商品加载失败'
+					uni.showToast({ title: this.errorMessage, icon: 'none' })
 				} finally {
 					this.loading = false
 				}
 			},
 			selectCategory(item) {
+				if (this.category === item) return
 				this.category = item
+				this.loadProducts()
+			},
+			clearFilter() {
+				this.keyword = ''
+				this.category = '全部'
 				this.loadProducts()
 			},
 			goDetail(id) {
@@ -132,16 +152,31 @@
 		font-weight: 600;
 	}
 
+	.section-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 20rpx;
+	}
+
 	.section-title {
 		font-size: 34rpx;
 		font-weight: 700;
-		margin-bottom: 20rpx;
+	}
+
+	.clear-filter {
+		color: #1677ff;
+		font-size: 26rpx;
 	}
 
 	.empty {
 		padding: 80rpx 0;
 		text-align: center;
 		color: #6b7280;
+	}
+
+	.error-text {
+		color: #ef4444;
 	}
 
 	.product-card {
@@ -206,4 +241,3 @@
 		font-size: 24rpx;
 	}
 </style>
-

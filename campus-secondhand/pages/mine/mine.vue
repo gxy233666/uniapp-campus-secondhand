@@ -14,15 +14,29 @@
 		</view>
 
 		<view v-if="loading" class="empty">加载中...</view>
-		<view v-else-if="currentList.length === 0" class="empty">暂无数据</view>
+		<view v-else-if="errorMessage" class="empty error-text">{{ errorMessage }}</view>
+		<view v-else-if="currentList.length === 0" class="empty">{{ emptyText }}</view>
 		<view v-else>
-			<view v-for="item in currentList" :key="item._id" class="product-card" @click="goDetail(item._id)">
+			<view
+				v-for="item in currentList"
+				:key="item._id"
+				class="product-card"
+				:class="{ 'offline-card': activeTab === 'products' && item.status !== '在售' }"
+				@click="goDetail(item._id)"
+			>
 				<view class="product-main">
 					<view class="product-title">{{ item.title }}</view>
 					<view class="muted">{{ item.category }} · {{ item.condition }}</view>
-					<view class="price">￥{{ item.price }}</view>
+					<view class="status-line">
+						<text class="price">￥{{ item.price }}</text>
+						<text v-if="activeTab === 'products'" class="status-tag" :class="{ offline: item.status !== '在售' }">{{ item.status }}</text>
+					</view>
 				</view>
-				<button v-if="activeTab === 'products'" class="remove-btn" @click.stop="removeProduct(item._id)">下架</button>
+				<view v-if="activeTab === 'products'" class="action-buttons">
+					<button class="action-btn edit-btn" @click.stop="editProduct(item._id)">编辑</button>
+					<button v-if="item.status === '在售'" class="action-btn status-btn" @click.stop="offlineProduct(item._id)">下架</button>
+					<button class="action-btn delete-btn" @click.stop="deleteProduct(item._id)">删除</button>
+				</view>
 			</view>
 		</view>
 	</view>
@@ -38,12 +52,16 @@
 				activeTab: 'products',
 				myProducts: [],
 				favorites: [],
-				loading: false
+				loading: false,
+				errorMessage: ''
 			}
 		},
 		computed: {
 			currentList() {
 				return this.activeTab === 'products' ? this.myProducts : this.favorites
+			},
+			emptyText() {
+				return this.activeTab === 'products' ? '暂无发布商品' : '暂无收藏商品'
 			}
 		},
 		watch: {
@@ -60,24 +78,22 @@
 				uni.navigateTo({ url: '/pages/login/login' })
 			},
 			async loadData() {
+				this.errorMessage = ''
 				if (!this.user) return
 				this.loading = true
 				try {
 					if (this.activeTab === 'products') {
 						const res = await productApi.myList(this.user._id)
-						if (res.code !== 0) {
-							throw new Error(res.message || '我的发布加载失败')
-						}
+						if (res.code !== 0) throw new Error(res.message || '我的发布加载失败')
 						this.myProducts = res.data || []
 					} else {
 						const res = await favoriteApi.list(this.user._id)
-						if (res.code !== 0) {
-							throw new Error(res.message || '我的收藏加载失败')
-						}
+						if (res.code !== 0) throw new Error(res.message || '我的收藏加载失败')
 						this.favorites = res.data || []
 					}
 				} catch (error) {
-					uni.showToast({ title: error.message || '数据加载失败', icon: 'none' })
+					this.errorMessage = error.message || '数据加载失败'
+					uni.showToast({ title: this.errorMessage, icon: 'none' })
 				} finally {
 					this.loading = false
 				}
@@ -85,17 +101,35 @@
 			goDetail(id) {
 				uni.navigateTo({ url: `/pages/product-detail/product-detail?id=${id}` })
 			},
-			async removeProduct(id) {
+			editProduct(id) {
+				uni.navigateTo({ url: `/pages/product-edit/product-edit?id=${id}` })
+			},
+			async offlineProduct(id) {
 				try {
 					const res = await productApi.remove(id, this.user._id)
-					if (res.code !== 0) {
-						throw new Error(res.message || '下架失败')
-					}
+					if (res.code !== 0) throw new Error(res.message || '下架失败')
 					uni.showToast({ title: '已下架', icon: 'none' })
 					this.loadData()
 				} catch (error) {
 					uni.showToast({ title: error.message || '下架失败', icon: 'none' })
 				}
+			},
+			deleteProduct(id) {
+				uni.showModal({
+					title: '确认删除',
+					content: '删除后该商品将不再展示，是否继续？',
+					success: async (res) => {
+						if (!res.confirm) return
+						try {
+							const result = await productApi.deleteProduct(id, this.user._id)
+							if (result.code !== 0) throw new Error(result.message || '删除失败')
+							uni.showToast({ title: '已删除', icon: 'none' })
+							this.loadData()
+						} catch (error) {
+							uni.showToast({ title: error.message || '删除失败', icon: 'none' })
+						}
+					}
+				})
 			}
 		}
 	}
@@ -154,19 +188,28 @@
 		color: #6b7280;
 	}
 
+	.error-text {
+		color: #ef4444;
+	}
+
 	.product-card {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
+		gap: 18rpx;
 		background: #ffffff;
 		border-radius: 12rpx;
 		padding: 22rpx;
 		margin-bottom: 18rpx;
 	}
 
+	.product-card.offline-card {
+		background: #f3f4f6;
+		border: 1rpx solid #e5e7eb;
+	}
+
 	.product-main {
 		min-width: 0;
-		flex: 1;
+		width: 100%;
 	}
 
 	.product-title {
@@ -175,19 +218,68 @@
 		margin-bottom: 8rpx;
 	}
 
-	.price {
-		color: #ef4444;
-		font-weight: 700;
+	.offline-card .product-title,
+	.offline-card .muted {
+		color: #6b7280;
+	}
+
+	.status-line {
+		display: flex;
+		align-items: center;
+		gap: 14rpx;
 		margin-top: 8rpx;
 	}
 
-	.remove-btn {
-		width: 120rpx;
-		height: 64rpx;
-		line-height: 64rpx;
+	.price {
+		color: #ef4444;
+		font-weight: 700;
+	}
+
+	.offline-card .price {
+		color: #9ca3af;
+	}
+
+	.status-tag {
+		padding: 4rpx 10rpx;
+		border-radius: 8rpx;
+		font-size: 22rpx;
+		color: #1677ff;
+		background: #edf5ff;
+	}
+
+	.status-tag.offline {
+		color: #6b7280;
+		background: #e5e7eb;
+	}
+
+	.action-buttons {
+		display: flex;
+		align-items: center;
+		gap: 12rpx;
+		width: 100%;
+	}
+
+	.action-btn {
+		flex: 1;
+		height: 60rpx;
+		line-height: 60rpx;
 		font-size: 24rpx;
+		border-radius: 8rpx;
+		padding: 0;
+	}
+
+	.edit-btn {
+		color: #1677ff;
+		background: #edf5ff;
+	}
+
+	.status-btn {
+		color: #047857;
+		background: #ecfdf5;
+	}
+
+	.delete-btn {
 		color: #ef4444;
 		background: #fff1f2;
-		border-radius: 8rpx;
 	}
 </style>

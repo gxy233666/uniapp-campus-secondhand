@@ -1,4 +1,4 @@
-const productObject = uniCloud.importObject('product')
+﻿const productObject = uniCloud.importObject('product')
 const favoriteObject = uniCloud.importObject('favorite')
 const userObject = uniCloud.importObject('user')
 
@@ -34,6 +34,9 @@ export const productApi = {
 	},
 	remove(id, userId) {
 		return productObject.remove(id, userId)
+	},
+	deleteProduct(id, userId) {
+		return productObject.deleteProduct(id, userId)
 	},
 	myList(userId) {
 		return productObject.myList(userId)

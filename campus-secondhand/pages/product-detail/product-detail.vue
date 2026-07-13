@@ -1,7 +1,8 @@
-<template>
+﻿<template>
 	<view class="page">
-		<view v-if="!product" class="empty">商品加载中...</view>
-		<view v-else>
+		<view v-if="loading" class="empty">商品加载中...</view>
+		<view v-else-if="errorMessage" class="empty error-text">{{ errorMessage }}</view>
+		<view v-else-if="product">
 			<image class="hero-image" :src="product.image_url || defaultImage" mode="aspectFill"></image>
 			<view class="card detail-card">
 				<view class="title">{{ product.title }}</view>
@@ -33,6 +34,8 @@
 				id: '',
 				product: null,
 				favored: false,
+				loading: false,
+				errorMessage: '',
 				defaultImage: 'https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/uni@2x.png'
 			}
 		},
@@ -42,16 +45,24 @@
 		},
 		methods: {
 			async loadDetail() {
+				this.loading = true
+				this.errorMessage = ''
 				try {
 					const res = await productApi.detail(this.id)
+					if (res.code !== 0) throw new Error(res.message || '详情加载失败')
 					this.product = res.data
 					const user = getCurrentUser()
 					if (user) {
 						const favoriteRes = await favoriteApi.check(user._id, this.id)
+						if (favoriteRes.code !== 0) throw new Error(favoriteRes.message || '收藏状态加载失败')
 						this.favored = !!favoriteRes.data
 					}
 				} catch (error) {
-					uni.showToast({ title: '详情加载失败', icon: 'none' })
+					this.product = null
+					this.errorMessage = error.message || '详情加载失败'
+					uni.showToast({ title: this.errorMessage, icon: 'none' })
+				} finally {
+					this.loading = false
 				}
 			},
 			async toggleFavorite() {
@@ -61,16 +72,19 @@
 					return
 				}
 				try {
+					let res
 					if (this.favored) {
-						await favoriteApi.remove(user._id, this.id)
+						res = await favoriteApi.remove(user._id, this.id)
+						if (res.code !== 0) throw new Error(res.message || '取消收藏失败')
 						this.favored = false
 					} else {
-						await favoriteApi.add(user._id, this.id)
+						res = await favoriteApi.add(user._id, this.id)
+						if (res.code !== 0) throw new Error(res.message || '收藏失败')
 						this.favored = true
 					}
 					uni.showToast({ title: this.favored ? '已收藏' : '已取消', icon: 'none' })
 				} catch (error) {
-					uni.showToast({ title: '操作失败', icon: 'none' })
+					uni.showToast({ title: error.message || '操作失败', icon: 'none' })
 				}
 			},
 			copyContact() {
@@ -85,6 +99,10 @@
 		padding-top: 120rpx;
 		text-align: center;
 		color: #6b7280;
+	}
+
+	.error-text {
+		color: #ef4444;
 	}
 
 	.hero-image {
