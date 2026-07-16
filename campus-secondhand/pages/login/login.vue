@@ -1,35 +1,149 @@
 <template>
 	<view class="page">
 		<view class="card auth-card">
-			<view class="title">账号登录</view>
-			<view class="hint">登录后可以发布商品、管理我的发布和收藏记录。</view>
+			<!-- 标题区 -->
+			<view class="brand-section">
+				<text class="brand-icon">🛍️</text>
+				<text class="title">校园二手</text>
+				<text class="slogan">登录后即可发布交易</text>
+			</view>
 
+			<!-- 登录/注册切换 -->
 			<view class="tabs">
-				<view class="tab" :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</view>
-				<view class="tab" :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</view>
-			</view>
-
-			<view v-if="mode === 'login'">
-				<view class="login-type-tabs">
-					<view class="login-type" :class="{ active: loginType === 'phone' }" @click="switchLoginType('phone')">手机号登录</view>
-					<view class="login-type" :class="{ active: loginType === 'email' }" @click="switchLoginType('email')">邮箱登录</view>
+				<view class="tab" :class="{ active: mode === 'login' }" @click="switchMode('login')">
+					登录
 				</view>
-				<input v-if="loginType === 'phone'" class="field" v-model="loginForm.phone" type="number" maxlength="11" placeholder="请输入手机号" />
-				<input v-else class="field" v-model="loginForm.email" placeholder="请输入邮箱" />
-				<input class="field" v-model="loginForm.password" password placeholder="请输入密码" />
-				<button class="primary-btn submit-btn" :disabled="loading" @click="submitLogin">{{ loading ? '登录中...' : '登录' }}</button>
+				<view class="tab" :class="{ active: mode === 'register' }" @click="switchMode('register')">
+					注册
+				</view>
 			</view>
 
+			<!-- 登录表单 -->
+			<view v-if="mode === 'login'">
+				<!-- 登录方式切换 -->
+				<view class="login-type-tabs">
+					<view
+						class="login-type"
+						:class="{ active: loginType === 'phone' }"
+						@click="switchLoginType('phone')"
+					>
+						<text class="type-icon">📱</text> 手机号
+					</view>
+					<view
+						class="login-type"
+						:class="{ active: loginType === 'email' }"
+						@click="switchLoginType('email')"
+					>
+						<text class="type-icon">✉️</text> 邮箱
+					</view>
+				</view>
+
+				<!-- 手机号输入 -->
+				<view class="input-wrapper" v-if="loginType === 'phone'">
+					<text class="input-icon">📱</text>
+					<input
+						class="field"
+						v-model="loginForm.phone"
+						type="number"
+						maxlength="11"
+						placeholder="请输入手机号"
+					/>
+				</view>
+				<!-- 邮箱输入 -->
+				<view class="input-wrapper" v-else>
+					<text class="input-icon">✉️</text>
+					<input
+						class="field"
+						v-model="loginForm.email"
+						placeholder="请输入邮箱"
+					/>
+				</view>
+				<!-- 密码输入 -->
+				<view class="input-wrapper">
+					<text class="input-icon">🔒</text>
+					<input
+						class="field"
+						v-model="loginForm.password"
+						password
+						placeholder="请输入密码"
+					/>
+				</view>
+
+				<button
+					class="primary-btn submit-btn"
+					:disabled="loading"
+					@click="submitLogin"
+				>
+					{{ loading ? '登录中...' : '登 录' }}
+				</button>
+			</view>
+
+			<!-- 注册表单 -->
 			<view v-else>
-				<input class="field" v-model="registerForm.username" placeholder="用户名，2-20 个字符" />
-				<input class="field" v-model="registerForm.phone" type="number" maxlength="11" placeholder="手机号" />
-				<input class="field" v-model="registerForm.email" placeholder="邮箱" />
+				<view class="input-wrapper">
+					<text class="input-icon">👤</text>
+					<input
+						class="field"
+						v-model="registerForm.username"
+						placeholder="用户名，2-20 个字符"
+					/>
+				</view>
+
+				<view class="input-wrapper">
+					<text class="input-icon">📱</text>
+					<input
+						class="field"
+						v-model="registerForm.phone"
+						type="number"
+						maxlength="11"
+						placeholder="手机号"
+					/>
+				</view>
+
+				<view class="input-wrapper">
+					<text class="input-icon">✉️</text>
+					<input
+						class="field"
+						v-model="registerForm.email"
+						placeholder="邮箱"
+					/>
+				</view>
+
 				<picker :range="schoolNames" @change="onSchoolChange">
-					<view class="field picker-field">{{ selectedSchool ? selectedSchool.name : '请选择院校' }}</view>
+					<view class="input-wrapper picker-input">
+						<text class="input-icon">🏫</text>
+						<text class="field picker-field">{{ selectedSchool ? selectedSchool.name : '请选择院校' }}</text>
+						<text class="picker-arrow">›</text>
+					</view>
 				</picker>
-				<input class="field" v-model="registerForm.password" password placeholder="密码，至少 6 位且包含字母和数字" />
-				<input class="field" v-model="registerForm.confirmPassword" password placeholder="确认密码" />
-				<button class="primary-btn submit-btn" :disabled="loading" @click="submitRegister">{{ loading ? '注册中...' : '注册并登录' }}</button>
+
+				<view class="input-wrapper">
+					<text class="input-icon">🔒</text>
+					<input
+						class="field"
+						v-model="registerForm.password"
+						password
+						placeholder="密码，至少 6 位，含字母和数字"
+					/>
+				</view>
+
+				<view class="input-wrapper">
+					<text class="input-icon">🔒</text>
+					<input
+						class="field"
+						v-model="registerForm.confirmPassword"
+						password
+						placeholder="确认密码"
+					/>
+				</view>
+
+				<button
+					class="primary-btn submit-btn"
+					:disabled="loading"
+					@click="submitRegister"
+				>
+					{{ loading ? '注册中...' : '注册并登录' }}
+				</button>
 			</view>
 		</view>
 	</view>
@@ -173,87 +287,183 @@
 </script>
 
 <style>
-	.auth-card {
-		padding-bottom: 34rpx;
+	/* 页面背景 */
+	.page {
+		background: linear-gradient(160deg, #f0f4ff 0%, #e9f0fa 100%);
+		min-height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 48rpx 32rpx;
+		box-sizing: border-box;
 	}
 
-	.title {
-		font-size: 38rpx;
-		font-weight: 700;
+	/* 卡片 */
+	.auth-card {
+		width: 100%;
+		background: #ffffff;
+		border-radius: 40rpx;
+		padding: 48rpx 36rpx 44rpx;
+		box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.08);
+	}
+
+	/* 品牌标识区 */
+	.brand-section {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		margin-bottom: 40rpx;
+	}
+
+	.brand-icon {
+		font-size: 64rpx;
 		margin-bottom: 12rpx;
 	}
 
-	.hint {
-		color: #6b7280;
-		line-height: 42rpx;
-		margin-bottom: 26rpx;
+	.title {
+		font-size: 40rpx;
+		font-weight: 800;
+		color: #1f2937;
+		margin-bottom: 8rpx;
 	}
 
+	.slogan {
+		font-size: 24rpx;
+		color: #6b7280;
+	}
+
+	/* 切换标签 */
 	.tabs {
 		display: flex;
 		background: #f3f4f6;
-		border-radius: 12rpx;
+		border-radius: 24rpx;
 		padding: 8rpx;
-		margin-bottom: 24rpx;
+		margin-bottom: 36rpx;
 	}
 
 	.tab {
 		flex: 1;
-		height: 68rpx;
-		line-height: 68rpx;
+		height: 72rpx;
+		line-height: 72rpx;
 		text-align: center;
-		border-radius: 8rpx;
+		border-radius: 20rpx;
+		font-size: 30rpx;
+		font-weight: 600;
 		color: #6b7280;
+		transition: all 0.2s;
 	}
 
 	.tab.active {
-		background: #1677ff;
-		color: #ffffff;
-		font-weight: 700;
+		background: #ffffff;
+		color: #1677ff;
+		box-shadow: 0 4rpx 12rpx rgba(22, 119, 255, 0.15);
 	}
 
+	/* 登录方式小标签 */
 	.login-type-tabs {
 		display: flex;
-		gap: 12rpx;
-		margin-bottom: 18rpx;
+		gap: 16rpx;
+		margin-bottom: 28rpx;
 	}
 
 	.login-type {
 		flex: 1;
-		height: 64rpx;
-		line-height: 64rpx;
+		height: 68rpx;
+		line-height: 68rpx;
 		text-align: center;
-		border-radius: 10rpx;
-		color: #4b5563;
+		border-radius: 20rpx;
+		font-size: 26rpx;
+		font-weight: 500;
 		background: #f9fafb;
+		color: #4b5563;
 		border: 1rpx solid #e5e7eb;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8rpx;
+		transition: all 0.2s;
 	}
 
 	.login-type.active {
-		color: #1677ff;
 		background: #edf5ff;
 		border-color: #1677ff;
-		font-weight: 700;
+		color: #1677ff;
+		font-weight: 600;
+	}
+
+	.type-icon {
+		font-size: 24rpx;
+	}
+
+	/* 输入框包装器 */
+	.input-wrapper {
+		display: flex;
+		align-items: center;
+		background: #f9fafb;
+		border-radius: 20rpx;
+		margin-bottom: 22rpx;
+		padding: 0 24rpx;
+		border: 1rpx solid #f3f4f6;
+		transition: border 0.2s;
+		position: relative;
+	}
+
+	.input-wrapper:focus-within {
+		background: #ffffff;
+		border-color: #1677ff;
+		box-shadow: 0 0 0 4rpx rgba(22, 119, 255, 0.08);
+	}
+
+	.input-icon {
+		font-size: 32rpx;
+		margin-right: 16rpx;
+		color: #6b7280;
 	}
 
 	.field {
-		width: 100%;
-		height: 82rpx;
-		line-height: 82rpx;
-		background: #f9fafb;
-		border-radius: 10rpx;
-		padding: 0 22rpx;
-		margin-bottom: 18rpx;
+		flex: 1;
+		height: 86rpx;
+		line-height: 86rpx;
+		background: transparent;
+		font-size: 28rpx;
 		box-sizing: border-box;
+	}
+
+	/* picker 选择器样式 */
+	.picker-input {
+		display: flex;
+		align-items: center;
 	}
 
 	.picker-field {
 		color: #4b5563;
+		flex: 1;
+		padding-right: 20rpx;
 	}
 
+	.picker-arrow {
+		font-size: 36rpx;
+		color: #cbd5e1;
+		font-weight: 300;
+	}
+
+	/* 提交按钮 */
 	.submit-btn {
-		margin-top: 8rpx;
-		height: 86rpx;
-		line-height: 86rpx;
+		margin-top: 12rpx;
+		height: 92rpx;
+		line-height: 92rpx;
+		background: linear-gradient(135deg, #1677ff, #4096ff);
+		color: #ffffff;
+		border-radius: 28rpx;
+		font-size: 32rpx;
+		font-weight: 700;
+		border: none;
+		box-shadow: 0 8rpx 24rpx rgba(22, 119, 255, 0.3);
+		transition: all 0.2s;
+	}
+
+	.submit-btn:active {
+		transform: scale(0.97);
+		box-shadow: 0 4rpx 12rpx rgba(22, 119, 255, 0.2);
 	}
 </style>

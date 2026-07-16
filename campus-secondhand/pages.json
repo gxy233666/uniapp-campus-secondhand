@@ -35,6 +35,12 @@
 			"style": {
 				"navigationBarTitleText": "切换用户"
 			}
+		},
+		{
+			"path": "pages/seed/seed",
+			"style": {
+				"navigationBarTitleText": "??????"
+			}
 		}
 	],
 	"tabBar": {
@@ -65,4 +71,3 @@
 	},
 	"uniIdRouter": {}
 }
-
