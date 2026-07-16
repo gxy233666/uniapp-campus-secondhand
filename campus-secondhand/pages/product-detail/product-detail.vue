@@ -1,87 +1,63 @@
 <template>
 	<view class="page">
-		<!-- 加载状态 -->
 		<view v-if="loading" class="empty loading-state">
 			<view class="loading-spinner"></view>
 			<text>商品加载中...</text>
 		</view>
 
-		<!-- 错误状态 -->
 		<view v-else-if="errorMessage" class="empty error-state">
-			<text class="empty-icon">⚠️</text>
+			<text class="empty-icon">!</text>
 			<text class="error-text">{{ errorMessage }}</text>
 		</view>
 
-		<!-- 商品详情 -->
 		<view v-else-if="product" class="content">
-			<!-- 商品图片 -->
 			<view class="hero-image-wrapper">
-				<image
-					class="hero-image"
-					:src="product.image_url || defaultImage"
-					mode="aspectFill"
-				></image>
-				<!-- 状态标签浮于图片上 -->
-				<view class="status-badge" :class="{ offline: product.status !== '在售' }">
-					{{ product.status }}
-				</view>
+				<image class="hero-image" :src="product.image_url || defaultImage" mode="aspectFill"></image>
+				<view class="status-badge" :class="{ offline: product.status !== '在售' }">{{ product.status }}</view>
 			</view>
 
-			<!-- 商品基本信息卡片 -->
 			<view class="card detail-card">
 				<view class="title">{{ product.title }}</view>
 				<view class="price">¥{{ product.price }}</view>
 				<view class="meta">
-					<view class="meta-item">
-						<text class="meta-icon">🏫</text>
-						{{ product.school_name || '未标注院校' }}
-					</view>
-					<view class="meta-item">
-						<text class="meta-icon">📦</text>
-						{{ product.category }}
-					</view>
-					<view class="meta-item">
-						<text class="meta-icon">✨</text>
-						{{ product.condition }}
-					</view>
+					<view class="meta-item">{{ product.school_name || '未标注院校' }}</view>
+					<view class="meta-item">{{ product.category }}</view>
+					<view class="meta-item">{{ product.condition }}</view>
 				</view>
 
-				<!-- 分隔线 -->
 				<view class="divider"></view>
 
-				<!-- 商品描述 -->
 				<view class="section">
-					<text class="label">📋 商品描述</text>
-					<text class="description">{{ product.description }}</text>
+					<text class="label">商品描述</text>
+					<text class="description">{{ product.description || '卖家暂未填写详细描述' }}</text>
 				</view>
 
-				<!-- 卖家信息 -->
 				<view class="section">
-					<text class="label">👤 卖家信息</text>
+					<text class="label">卖家信息</text>
 					<view class="seller">
 						<text class="seller-name">{{ product.seller_name }}</text>
-						<text class="seller-contact">{{ product.contact }}</text>
+						<text class="seller-contact protected">联系方式：提交购买意向并经卖家同意后可见</text>
 					</view>
 				</view>
 			</view>
 
-			<!-- 底部操作按钮 -->
 			<view class="action-row">
-				<button class="ghost-btn" @click="toggleFavorite">
-					<text class="btn-icon">{{ favored ? '❤️' : '🤍' }}</text>
-					{{ favored ? '已收藏' : '收藏' }}
-				</button>
-				<button class="primary-btn contact-btn" @click="copyContact">
-					<text class="btn-icon">📞</text>
-					联系卖家
-				</button>
+				<button class="ghost-btn" @click="toggleFavorite">{{ favored ? '已收藏' : '收藏' }}</button>
+				<button class="primary-btn contact-btn" :disabled="product.status !== '在售'" @click="toggleIntentPanel">联系卖家</button>
+			</view>
+
+			<view v-if="showIntentPanel" class="card intent-card">
+				<view class="intent-title">提交购买意向</view>
+				<view class="intent-tip">卖家同意后，你可以在“我的-我想买的”中查看并复制卖家联系方式，再进行线下沟通和交易。</view>
+				<textarea class="intent-textarea" v-model="intentMessage" maxlength="300" placeholder="给卖家留言，例如：你好，这件商品还在吗？"></textarea>
+				<button class="submit-intent-btn" :disabled="submittingIntent" @click="submitIntent">{{ submittingIntent ? '提交中...' : '提交意向' }}</button>
 			</view>
 		</view>
 	</view>
 </template>
 
 <script>
-	import { favoriteApi, getCurrentUser, productApi } from '@/common/api.js'
+	import { favoriteApi, getCurrentUser, intentApi, productApi } from '@/common/api.js'
 
 	export default {
 		data() {
@@ -91,21 +67,29 @@
 				favored: false,
 				loading: false,
 				errorMessage: '',
+				showIntentPanel: false,
+				intentMessage: '',
+				submittingIntent: false,
 				defaultImage: 'https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/uni@2x.png'
 			}
 		},
 		onLoad(options) {
-			this.id = options.id
+			this.id = options.id || ''
 			this.loadDetail()
 		},
 		methods: {
 			async loadDetail() {
+				if (!this.id) {
+					this.errorMessage = '缺少商品ID'
+					return
+				}
 				this.loading = true
 				this.errorMessage = ''
 				try {
 					const res = await productApi.detail(this.id)
 					if (res.code !== 0) throw new Error(res.message || '详情加载失败')
 					this.product = res.data
+					this.intentMessage = `你好，我对《${this.product.title}》感兴趣，想进一步了解一下。`
 					const user = getCurrentUser()
 					if (user) {
 						const favoriteRes = await favoriteApi.check(user._id, this.id)
@@ -142,22 +126,61 @@
 					uni.showToast({ title: error.message || '操作失败', icon: 'none' })
 				}
 			},
-			copyContact() {
-				uni.setClipboardData({ data: this.product.contact || '' })
+			toggleIntentPanel() {
+				const user = getCurrentUser()
+				if (!user) {
+					uni.navigateTo({ url: '/pages/login/login' })
+					return
+				}
+				if (this.product && this.product.status !== '在售') {
+					uni.showToast({ title: '该商品已下架', icon: 'none' })
+					return
+				}
+				if (this.product && this.product.seller_id === user._id) {
+					uni.showToast({ title: '不能联系自己发布的商品', icon: 'none' })
+					return
+				}
+				this.showIntentPanel = !this.showIntentPanel
+			},
+			async submitIntent() {
+				const user = getCurrentUser()
+				if (!user) {
+					uni.navigateTo({ url: '/pages/login/login' })
+					return
+				}
+				this.submittingIntent = true
+				try {
+					const res = await intentApi.add({
+						product_id: this.id,
+						buyer_id: user._id,
+						buyer_name: user.username,
+						buyer_contact: user.phone || user.email || '',
+						message: this.intentMessage
+					})
+					if (res.code !== 0) throw new Error(res.message || '提交失败')
+					uni.showModal({
+						title: '意向已提交',
+						content: '请等待卖家同意。卖家同意后，你可以在“我的-我想买的”查看联系方式。',
+						showCancel: false
+					})
+					this.showIntentPanel = false
+				} catch (error) {
+					uni.showToast({ title: error.message || '提交失败', icon: 'none' })
+				} finally {
+					this.submittingIntent = false
+				}
 			}
 		}
 	}
 </script>
 
 <style>
-	/* 全局页面背景 */
 	.page {
 		background: linear-gradient(160deg, #f5f7fa 0%, #e9edf5 100%);
 		min-height: 100vh;
 		padding-bottom: 40rpx;
 	}
 
-	/* 空状态/加载/错误 */
 	.empty {
 		padding: 200rpx 0;
 		display: flex;
@@ -190,7 +213,6 @@
 		to { transform: rotate(360deg); }
 	}
 
-	/* 商品图片区域 */
 	.hero-image-wrapper {
 		position: relative;
 		width: 100%;
@@ -214,14 +236,12 @@
 		font-weight: 600;
 		padding: 6rpx 20rpx;
 		border-radius: 20rpx;
-		backdrop-filter: blur(8rpx);
 	}
 
 	.status-badge.offline {
 		background: rgba(107, 114, 128, 0.85);
 	}
 
-	/* 详情卡片 */
 	.content {
 		margin-top: -30rpx;
 		position: relative;
@@ -229,7 +249,8 @@
 		padding: 0 28rpx;
 	}
 
-	.detail-card {
+	.detail-card,
+	.intent-card {
 		background: #ffffff;
 		border-radius: 32rpx;
 		padding: 36rpx 28rpx;
@@ -251,7 +272,6 @@
 		margin-bottom: 24rpx;
 	}
 
-	/* 元信息标签 */
 	.meta {
 		display: flex;
 		gap: 14rpx;
@@ -260,28 +280,19 @@
 	}
 
 	.meta-item {
-		display: flex;
-		align-items: center;
 		background: #f3f4f6;
 		border-radius: 16rpx;
 		padding: 10rpx 20rpx;
 		font-size: 24rpx;
 		color: #374151;
-		gap: 6rpx;
 	}
 
-	.meta-icon {
-		font-size: 22rpx;
-	}
-
-	/* 分隔线 */
 	.divider {
 		height: 1rpx;
 		background: #f3f4f6;
 		margin: 28rpx 0;
 	}
 
-	/* 描述与卖家信息分区 */
 	.section {
 		margin-bottom: 28rpx;
 	}
@@ -325,7 +336,10 @@
 		color: #1677ff;
 	}
 
-	/* 底部操作按钮 */
+	.seller-contact.protected {
+		color: #6b7280;
+	}
+
 	.action-row {
 		display: flex;
 		gap: 20rpx;
@@ -340,10 +354,6 @@
 		line-height: 90rpx;
 		font-size: 30rpx;
 		border-radius: 24rpx;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8rpx;
 		font-weight: 600;
 		border: none;
 		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04);
@@ -361,13 +371,49 @@
 		box-shadow: 0 8rpx 24rpx rgba(22, 119, 255, 0.25);
 	}
 
-	.ghost-btn:active,
-	.contact-btn:active {
-		transform: scale(0.97);
-		opacity: 0.9;
+	.contact-btn[disabled] {
+		background: #d1d5db;
+		color: #ffffff;
 	}
 
-	.btn-icon {
+	.intent-card {
+		margin-top: 24rpx;
+	}
+
+	.intent-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1f2937;
+		margin-bottom: 10rpx;
+	}
+
+	.intent-tip {
+		font-size: 26rpx;
+		color: #6b7280;
+		line-height: 40rpx;
+		margin-bottom: 18rpx;
+	}
+
+	.intent-textarea {
+		width: 100%;
+		height: 160rpx;
+		background: #f9fafb;
+		border-radius: 18rpx;
+		padding: 20rpx;
+		box-sizing: border-box;
 		font-size: 28rpx;
+		line-height: 42rpx;
+		margin-bottom: 18rpx;
+	}
+
+	.submit-intent-btn {
+		width: 100%;
+		height: 80rpx;
+		line-height: 80rpx;
+		border-radius: 18rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		background: #1677ff;
+		color: #ffffff;
 	}
 </style>

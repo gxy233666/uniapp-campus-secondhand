@@ -1,17 +1,13 @@
-﻿<template>
+<template>
 	<view class="page">
-		<!-- 用户信息卡片 -->
 		<view class="card profile-card">
 			<view class="avatar-placeholder">
-				<text class="avatar-emoji">👤</text>
+				<text class="avatar-text">{{ avatarText }}</text>
 			</view>
 			<view class="profile-info">
 				<view class="username">{{ user ? user.username : '未登录' }}</view>
-				<view class="muted">{{ user ? user.phone : '请先登录账号' }}</view>
-				<view v-if="user && user.school_name" class="school-badge">
-					<text class="school-icon">🎓</text>
-					{{ user.school_name }}
-				</view>
+				<view class="muted">{{ user ? userContactText : '请先登录账号' }}</view>
+				<view v-if="user && user.school_name" class="school-badge">{{ user.school_name }}</view>
 			</view>
 			<view class="profile-actions">
 				<button class="switch-btn" @click="goLogin">{{ user ? '切换' : '登录' }}</button>
@@ -19,67 +15,60 @@
 			</view>
 		</view>
 
-		<!-- 标签切换 -->
-		<view class="tabs">
-			<view class="tab" :class="{ active: activeTab === 'products' }" @click="activeTab = 'products'">
-				我的发布
+		<scroll-view class="tabs-scroll" scroll-x>
+			<view class="tabs">
+				<view class="tab" :class="{ active: activeTab === 'products' }" @click="activeTab = 'products'">我的发布</view>
+				<view class="tab" :class="{ active: activeTab === 'favorites' }" @click="activeTab = 'favorites'">我的收藏</view>
+				<view class="tab" :class="{ active: activeTab === 'buyerIntents' }" @click="activeTab = 'buyerIntents'">我想买的</view>
+				<view class="tab" :class="{ active: activeTab === 'sellerIntents' }" @click="activeTab = 'sellerIntents'">收到意向</view>
 			</view>
-			<view class="tab" :class="{ active: activeTab === 'favorites' }" @click="activeTab = 'favorites'">
-				我的收藏
-			</view>
-		</view>
+		</scroll-view>
 
-		<!-- 加载/错误/空状态 -->
 		<view v-if="loading" class="empty loading-state">
 			<view class="loading-spinner"></view>
 			<text>加载中...</text>
 		</view>
 		<view v-else-if="errorMessage" class="empty error-state">
-			<text class="empty-icon">⚠️</text>
+			<text class="empty-icon">!</text>
 			<text class="error-text">{{ errorMessage }}</text>
 		</view>
 		<view v-else-if="currentList.length === 0" class="empty empty-state">
-			<text class="empty-icon">📭</text>
+			<text class="empty-icon">空</text>
 			<text>{{ emptyText }}</text>
 		</view>
 
-		<!-- 商品/收藏列表 -->
 		<view v-else class="list-container">
 			<view
 				v-for="item in currentList"
 				:key="item._id"
 				class="product-card"
 				:class="{ 'offline-card': activeTab === 'products' && item.status !== '在售' }"
-				@click="goDetail(item._id)"
+				@click="goItemDetail(item)"
 			>
-				<image
-					class="product-image"
-					:src="item.image_url || defaultImage"
-					mode="aspectFill"
-				></image>
+				<image class="product-image" :src="itemImage(item)" mode="aspectFill"></image>
 				<view class="product-main">
-					<view class="product-title">{{ item.title }}</view>
-					<view class="product-meta">
-						{{ item.school_name || '未标注院校' }} · {{ item.category }} · {{ item.condition }}
-					</view>
+					<view class="product-title">{{ itemTitle(item) }}</view>
+					<view class="product-meta">{{ itemMeta(item) }}</view>
 					<view class="status-line">
-						<text class="price">¥{{ item.price }}</text>
-						<text v-if="activeTab === 'products'" class="status-tag" :class="{ offline: item.status !== '在售' }">
-							{{ item.status }}
-						</text>
+						<text class="price">¥{{ itemPrice(item) }}</text>
+						<text v-if="activeTab === 'products'" class="status-tag" :class="{ offline: item.status !== '在售' }">{{ item.status }}</text>
+						<text v-if="isIntentTab" class="status-tag" :class="intentStatusClass(item)">{{ displayIntentStatus(item.status) }}</text>
 					</view>
+					<view v-if="isIntentTab" class="intent-message">留言：{{ item.message }}</view>
+					<view v-if="isIntentTab" class="contact-hint">{{ intentContactHint(item) }}</view>
 				</view>
-				<!-- 操作按钮组 -->
+
 				<view v-if="activeTab === 'products'" class="action-buttons">
-					<button class="action-btn edit-btn" @click.stop="editProduct(item._id)">
-						<text class="btn-icon">✎</text> 编辑
-					</button>
-					<button v-if="item.status === '在售'" class="action-btn status-btn" @click.stop="offlineProduct(item._id)">
-						<text class="btn-icon">↓</text> 下架
-					</button>
-					<button class="action-btn delete-btn" @click.stop="deleteProduct(item._id)">
-						<text class="btn-icon">✕</text> 删除
-					</button>
+					<button class="action-btn edit-btn" @click.stop="editProduct(item._id)">编辑</button>
+					<button v-if="item.status === '在售'" class="action-btn status-btn" @click.stop="offlineProduct(item._id)">下架</button>
+					<button class="action-btn delete-btn" @click.stop="deleteProduct(item._id)">删除</button>
+				</view>
+
+				<view v-if="isIntentTab" class="action-buttons">
+					<button class="action-btn copy-btn" @click.stop="copyIntentContact(item)">{{ copyButtonText(item) }}</button>
+					<button v-if="canApproveIntent(item)" class="action-btn status-btn" @click.stop="updateIntentStatus(item, '已同意')">同意联系</button>
+					<button v-if="canCompleteIntent(item)" class="action-btn edit-btn" @click.stop="updateIntentStatus(item, '已完成')">完成</button>
+					<button v-if="canCancelIntent(item)" class="action-btn delete-btn" @click.stop="updateIntentStatus(item, '已取消')">取消</button>
 				</view>
 			</view>
 		</view>
@@ -87,7 +76,7 @@
 </template>
 
 <script>
-	import { clearCurrentUser, favoriteApi, getCurrentUser, productApi } from '@/common/api.js'
+	import { clearCurrentUser, favoriteApi, getCurrentUser, intentApi, productApi } from '@/common/api.js'
 
 	export default {
 		data() {
@@ -96,18 +85,39 @@
 				activeTab: 'products',
 				myProducts: [],
 				favorites: [],
+				buyerIntents: [],
+				sellerIntents: [],
 				loading: false,
 				errorMessage: '',
 				defaultImage: 'https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/uni@2x.png'
 			}
 		},
 		computed: {
+			avatarText() {
+				return this.user && this.user.username ? this.user.username.slice(0, 1) : '我'
+			},
+			userContactText() {
+				if (!this.user) return ''
+				return this.user.phone || this.user.email || '暂无联系方式'
+			},
+			isIntentTab() {
+				return this.activeTab === 'buyerIntents' || this.activeTab === 'sellerIntents'
+			},
 			currentList() {
-				return this.activeTab === 'products' ? this.myProducts : this.favorites
+				if (this.activeTab === 'products') return this.myProducts
+				if (this.activeTab === 'favorites') return this.favorites
+				if (this.activeTab === 'buyerIntents') return this.buyerIntents
+				return this.sellerIntents
 			},
 			emptyText() {
 				if (!this.user) return '登录后查看数据'
-				return this.activeTab === 'products' ? '暂无发布商品' : '暂无收藏商品'
+				const textMap = {
+					products: '暂无发布商品',
+					favorites: '暂无收藏商品',
+					buyerIntents: '暂无购买意向',
+					sellerIntents: '暂无收到意向'
+				}
+				return textMap[this.activeTab]
 			}
 		},
 		watch: {
@@ -133,6 +143,8 @@
 						this.user = null
 						this.myProducts = []
 						this.favorites = []
+						this.buyerIntents = []
+						this.sellerIntents = []
 						this.errorMessage = ''
 						this.activeTab = 'products'
 						uni.showToast({ title: '已退出登录', icon: 'none' })
@@ -144,18 +156,29 @@
 				if (!this.user) {
 					this.myProducts = []
 					this.favorites = []
+					this.buyerIntents = []
+					this.sellerIntents = []
 					return
 				}
 				this.loading = true
 				try {
+					let res
 					if (this.activeTab === 'products') {
-						const res = await productApi.myList(this.user._id)
+						res = await productApi.myList(this.user._id)
 						if (res.code !== 0) throw new Error(res.message || '我的发布加载失败')
 						this.myProducts = res.data || []
-					} else {
-						const res = await favoriteApi.list(this.user._id)
+					} else if (this.activeTab === 'favorites') {
+						res = await favoriteApi.list(this.user._id)
 						if (res.code !== 0) throw new Error(res.message || '我的收藏加载失败')
 						this.favorites = res.data || []
+					} else if (this.activeTab === 'buyerIntents') {
+						res = await intentApi.listBuyer(this.user._id)
+						if (res.code !== 0) throw new Error(res.message || '我想买的加载失败')
+						this.buyerIntents = res.data || []
+					} else {
+						res = await intentApi.listSeller(this.user._id)
+						if (res.code !== 0) throw new Error(res.message || '收到意向加载失败')
+						this.sellerIntents = res.data || []
 					}
 				} catch (error) {
 					this.errorMessage = error.message || '数据加载失败'
@@ -164,7 +187,22 @@
 					this.loading = false
 				}
 			},
-			goDetail(id) {
+			itemTitle(item) {
+				return this.isIntentTab ? item.product_title : item.title
+			},
+			itemPrice(item) {
+				return this.isIntentTab ? item.product_price : item.price
+			},
+			itemImage(item) {
+				return (this.isIntentTab ? item.product_image : item.image_url) || this.defaultImage
+			},
+			itemMeta(item) {
+				if (this.activeTab === 'buyerIntents') return `${item.product_school_name || '未标注院校'} / 卖家：${item.seller_name}`
+				if (this.activeTab === 'sellerIntents') return `${item.product_school_name || '未标注院校'} / 买家：${item.buyer_name}`
+				return `${item.school_name || '未标注院校'} / ${item.category} / ${item.condition}`
+			},
+			goItemDetail(item) {
+				const id = this.isIntentTab ? item.product_id : item._id
 				uni.navigateTo({ url: `/pages/product-detail/product-detail?id=${id}` })
 			},
 			editProduct(id) {
@@ -196,13 +234,77 @@
 						}
 					}
 				})
+			},
+			displayIntentStatus(status) {
+				if (status === '待联系') return '待确认'
+				if (status === '已联系') return '已同意'
+				return status || '待确认'
+			},
+			isApprovedIntent(item) {
+				return ['已同意', '已完成', '已联系'].includes(item.status)
+			},
+			isPendingIntent(item) {
+				return ['待确认', '待联系'].includes(item.status)
+			},
+			isFinalIntent(item) {
+				return ['已完成', '已取消'].includes(item.status)
+			},
+			intentStatusClass(item) {
+				const status = this.displayIntentStatus(item.status)
+				return {
+					pending: status === '待确认',
+					approved: status === '已同意',
+					done: status === '已完成',
+					cancelled: status === '已取消'
+				}
+			},
+			intentContactHint(item) {
+				if (this.activeTab === 'buyerIntents') {
+					if (!this.isApprovedIntent(item)) return '卖家联系方式：等待卖家同意后可见'
+					return `卖家联系方式：${item.seller_contact || '暂无'}`
+				}
+				return `买家联系方式：${item.buyer_contact || '暂无'}`
+			},
+			copyButtonText(item) {
+				if (this.activeTab === 'buyerIntents' && !this.isApprovedIntent(item)) return '待同意后可复制'
+				return this.activeTab === 'buyerIntents' ? '复制卖家联系方式' : '复制买家联系方式'
+			},
+			copyIntentContact(item) {
+				if (this.activeTab === 'buyerIntents' && !this.isApprovedIntent(item)) {
+					uni.showToast({ title: '卖家同意后可查看联系方式', icon: 'none' })
+					return
+				}
+				const contact = this.activeTab === 'buyerIntents' ? item.seller_contact : item.buyer_contact
+				if (!contact) {
+					uni.showToast({ title: '暂无联系方式', icon: 'none' })
+					return
+				}
+				uni.setClipboardData({ data: contact })
+			},
+			canApproveIntent(item) {
+				return this.activeTab === 'sellerIntents' && this.isPendingIntent(item)
+			},
+			canCompleteIntent(item) {
+				return this.isApprovedIntent(item) && !this.isFinalIntent(item)
+			},
+			canCancelIntent(item) {
+				return !this.isFinalIntent(item)
+			},
+			async updateIntentStatus(item, status) {
+				try {
+					const res = await intentApi.updateStatus(item._id, this.user._id, status)
+					if (res.code !== 0) throw new Error(res.message || '更新失败')
+					uni.showToast({ title: '已更新', icon: 'none' })
+					this.loadData()
+				} catch (error) {
+					uni.showToast({ title: error.message || '更新失败', icon: 'none' })
+				}
 			}
 		}
 	}
 </script>
 
 <style>
-	/* 页面背景 */
 	.page {
 		background: linear-gradient(160deg, #f5f7fa 0%, #e9edf5 100%);
 		min-height: 100vh;
@@ -210,16 +312,20 @@
 		box-sizing: border-box;
 	}
 
-	/* 用户卡片 */
+	.card,
+	.profile-card,
+	.product-card {
+		background: #ffffff;
+		box-shadow: 0 8rpx 28rpx rgba(0, 0, 0, 0.04);
+	}
+
 	.profile-card {
 		display: flex;
 		align-items: center;
 		gap: 24rpx;
 		padding: 32rpx 28rpx;
 		margin-bottom: 28rpx;
-		background: #ffffff;
 		border-radius: 28rpx;
-		box-shadow: 0 8rpx 28rpx rgba(0, 0, 0, 0.04);
 	}
 
 	.avatar-placeholder {
@@ -233,8 +339,10 @@
 		flex-shrink: 0;
 	}
 
-	.avatar-emoji {
-		font-size: 48rpx;
+	.avatar-text {
+		font-size: 42rpx;
+		font-weight: 800;
+		color: #1677ff;
 	}
 
 	.profile-info {
@@ -264,11 +372,6 @@
 		border-radius: 14rpx;
 		font-size: 24rpx;
 		font-weight: 500;
-		gap: 6rpx;
-	}
-
-	.school-icon {
-		font-size: 22rpx;
 	}
 
 	.profile-actions {
@@ -288,7 +391,6 @@
 		padding: 0;
 		text-align: center;
 		font-weight: 500;
-		box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
 	}
 
 	.switch-btn {
@@ -301,26 +403,29 @@
 		background: #fff1f2;
 	}
 
-	/* 标签切换 */
+	.tabs-scroll {
+		white-space: nowrap;
+		margin-bottom: 28rpx;
+	}
+
 	.tabs {
-		display: flex;
+		display: inline-flex;
 		background: #ffffff;
 		border-radius: 22rpx;
 		padding: 8rpx;
-		margin-bottom: 28rpx;
 		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03);
 	}
 
 	.tab {
-		flex: 1;
+		min-width: 150rpx;
 		text-align: center;
 		height: 72rpx;
 		line-height: 72rpx;
 		border-radius: 18rpx;
-		font-size: 28rpx;
+		font-size: 26rpx;
 		color: #6b7280;
-		transition: all 0.2s;
 		font-weight: 500;
+		padding: 0 16rpx;
 	}
 
 	.tab.active {
@@ -330,7 +435,6 @@
 		box-shadow: 0 4rpx 12rpx rgba(22,119,255,0.25);
 	}
 
-	/* 空状态/加载/错误 */
 	.empty {
 		padding: 120rpx 0;
 		display: flex;
@@ -342,8 +446,9 @@
 	}
 
 	.empty-icon {
-		font-size: 80rpx;
-		opacity: 0.8;
+		font-size: 48rpx;
+		font-weight: 700;
+		color: #9ca3af;
 	}
 
 	.error-text {
@@ -364,7 +469,6 @@
 		to { transform: rotate(360deg); }
 	}
 
-	/* 商品卡片 */
 	.list-container {
 		margin-top: 8rpx;
 	}
@@ -372,19 +476,11 @@
 	.product-card {
 		display: flex;
 		flex-wrap: wrap;
-		background: #ffffff;
 		border-radius: 24rpx;
 		padding: 24rpx;
 		margin-bottom: 20rpx;
-		box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03);
-		transition: all 0.2s;
 		gap: 20rpx;
 		align-items: center;
-	}
-
-	.product-card:active {
-		transform: scale(0.98);
-		box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
 	}
 
 	.product-card.offline-card {
@@ -420,16 +516,32 @@
 		color: #6b7280;
 	}
 
-	.product-meta {
+	.product-meta,
+	.intent-message,
+	.contact-hint {
 		font-size: 24rpx;
 		color: #9ca3af;
 		margin-bottom: 10rpx;
+		line-height: 36rpx;
+	}
+
+	.intent-message {
+		color: #4b5563;
+		white-space: normal;
+	}
+
+	.contact-hint {
+		color: #6b7280;
+		background: #f9fafb;
+		border-radius: 12rpx;
+		padding: 8rpx 12rpx;
 	}
 
 	.status-line {
 		display: flex;
 		align-items: center;
 		gap: 14rpx;
+		margin-bottom: 8rpx;
 	}
 
 	.price {
@@ -450,18 +562,34 @@
 		background: #edf5ff;
 	}
 
-	.status-tag.offline {
+	.status-tag.offline,
+	.status-tag.cancelled {
 		color: #6b7280;
 		background: #e5e7eb;
 	}
 
-	/* 操作按钮组 */
+	.status-tag.pending {
+		color: #b45309;
+		background: #fffbeb;
+	}
+
+	.status-tag.approved {
+		color: #047857;
+		background: #ecfdf5;
+	}
+
+	.status-tag.done {
+		color: #1677ff;
+		background: #edf5ff;
+	}
+
 	.action-buttons {
 		width: 100%;
 		display: flex;
 		justify-content: flex-end;
 		gap: 14rpx;
 		margin-top: 8rpx;
+		flex-wrap: wrap;
 	}
 
 	.action-btn {
@@ -470,17 +598,9 @@
 		font-size: 24rpx;
 		border-radius: 16rpx;
 		padding: 0 20rpx;
-		display: flex;
-		align-items: center;
-		gap: 6rpx;
 		background: #f3f4f6;
 		color: #4b5563;
 		font-weight: 500;
-		box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
-	}
-
-	.btn-icon {
-		font-size: 22rpx;
 	}
 
 	.edit-btn {
@@ -496,5 +616,10 @@
 	.delete-btn {
 		background: #fff1f2;
 		color: #ef4444;
+	}
+
+	.copy-btn {
+		background: #f3f4f6;
+		color: #4b5563;
 	}
 </style>

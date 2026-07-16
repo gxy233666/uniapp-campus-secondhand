@@ -1,0 +1,81 @@
+{
+	"bsonType": "object",
+	"required": ["product_id", "product_title", "seller_id", "seller_name", "buyer_id", "buyer_name", "message", "status"],
+	"permission": {
+		"read": true,
+		"create": true,
+		"update": true,
+		"delete": false
+	},
+	"properties": {
+		"_id": {
+			"description": "交易意向ID"
+		},
+		"product_id": {
+			"bsonType": "string",
+			"title": "商品ID"
+		},
+		"product_title": {
+			"bsonType": "string",
+			"title": "商品标题"
+		},
+		"product_price": {
+			"bsonType": "number",
+			"title": "商品价格"
+		},
+		"product_image": {
+			"bsonType": "string",
+			"title": "商品图片"
+		},
+		"product_school_id": {
+			"bsonType": "string",
+			"title": "商品院校标识"
+		},
+		"product_school_name": {
+			"bsonType": "string",
+			"title": "商品院校名称"
+		},
+		"seller_id": {
+			"bsonType": "string",
+			"title": "卖家ID"
+		},
+		"seller_name": {
+			"bsonType": "string",
+			"title": "卖家名称"
+		},
+		"seller_contact": {
+			"bsonType": "string",
+			"title": "卖家联系方式"
+		},
+		"buyer_id": {
+			"bsonType": "string",
+			"title": "买家ID"
+		},
+		"buyer_name": {
+			"bsonType": "string",
+			"title": "买家名称"
+		},
+		"buyer_contact": {
+			"bsonType": "string",
+			"title": "买家联系方式"
+		},
+		"message": {
+			"bsonType": "string",
+			"title": "留言",
+			"maxLength": 300
+		},
+		"status": {
+			"bsonType": "string",
+			"title": "意向状态",
+			"enum": ["待确认", "已同意", "已完成", "已取消"]
+		},
+		"created_at": {
+			"bsonType": "number",
+			"title": "创建时间"
+		},
+		"updated_at": {
+			"bsonType": "number",
+			"title": "更新时间"
+		}
+	}
+}

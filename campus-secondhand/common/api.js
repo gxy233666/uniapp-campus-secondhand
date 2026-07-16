@@ -3,6 +3,7 @@ const favoriteObject = uniCloud.importObject('favorite')
 const userObject = uniCloud.importObject('user')
 const schoolObject = uniCloud.importObject('school')
 const seedObject = uniCloud.importObject('seed')
+const intentObject = uniCloud.importObject('intent')
 
 export function getCurrentUser() {
 	return uni.getStorageSync('currentUser') || null
@@ -82,5 +83,20 @@ export const favoriteApi = {
 	},
 	check(userId, productId) {
 		return favoriteObject.check(userId, productId)
+	}
+}
+
+export const intentApi = {
+	add(data) {
+		return intentObject.add(data)
+	},
+	listBuyer(userId) {
+		return intentObject.listBuyer(userId)
+	},
+	listSeller(userId) {
+		return intentObject.listSeller(userId)
+	},
+	updateStatus(id, userId, status) {
+		return intentObject.updateStatus(id, userId, status)
 	}
 }
