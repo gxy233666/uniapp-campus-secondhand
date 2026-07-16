@@ -76,13 +76,15 @@
 				<view v-if="activeTab === 'products'" class="action-buttons">
 					<button class="action-btn edit-btn" @click.stop="editProduct(item._id)">编辑</button>
 					<button v-if="item.status === '在售'" class="action-btn status-btn" @click.stop="offlineProduct(item._id)">下架</button>
+					<button v-if="item.status === '在售'" class="action-btn sold-btn" @click.stop="soldProduct(item._id)">标记售出</button>
 					<button class="action-btn delete-btn" @click.stop="deleteProduct(item._id)">删除</button>
 				</view>
 
 				<view v-if="isIntentTab" class="action-buttons">
 					<button class="action-btn copy-btn" @click.stop="copyIntentContact(item)">{{ copyButtonText(item) }}</button>
 					<button v-if="canApproveIntent(item)" class="action-btn status-btn important-btn" @click.stop="updateIntentStatus(item, '已同意')">同意联系</button>
-					<button v-if="canCompleteIntent(item)" class="action-btn edit-btn" @click.stop="updateIntentStatus(item, '已完成')">完成</button>
+					<button v-if="canRejectIntent(item)" class="action-btn reject-btn" @click.stop="updateIntentStatus(item, '已拒绝')">拒绝</button>
+					<button v-if="canCompleteIntent(item)" class="action-btn sold-btn" @click.stop="updateIntentStatus(item, '已完成')">完成交易</button>
 					<button v-if="canCancelIntent(item)" class="action-btn delete-btn" @click.stop="updateIntentStatus(item, '已取消')">取消</button>
 				</view>
 			</view>
@@ -257,6 +259,23 @@
 					uni.showToast({ title: error.message || '下架失败', icon: 'none' })
 				}
 			},
+			soldProduct(id) {
+				uni.showModal({
+					title: '\u786e\u8ba4\u552e\u51fa',
+					content: '\u6807\u8bb0\u552e\u51fa\u540e\u5546\u54c1\u5c06\u4e0d\u518d\u51fa\u73b0\u5728\u9996\u9875\u5728\u552e\u5217\u8868\uff0c\u662f\u5426\u7ee7\u7eed\uff1f',
+					success: async (res) => {
+						if (!res.confirm) return
+						try {
+							const result = await productApi.markSold(id, this.user._id)
+							if (result.code !== 0) throw new Error(result.message || '\u6807\u8bb0\u552e\u51fa\u5931\u8d25')
+							uni.showToast({ title: '\u5df2\u6807\u8bb0\u552e\u51fa', icon: 'none' })
+							this.loadData()
+						} catch (error) {
+							uni.showToast({ title: error.message || '\u6807\u8bb0\u552e\u51fa\u5931\u8d25', icon: 'none' })
+						}
+					}
+				})
+			},
 			deleteProduct(id) {
 				uni.showModal({
 					title: '确认删除',
@@ -337,11 +356,14 @@
 			canApproveIntent(item) {
 				return this.activeTab === 'sellerIntents' && this.isPendingIntent(item)
 			},
+			canRejectIntent(item) {
+				return this.activeTab === 'sellerIntents' && this.isPendingIntent(item)
+			},
 			canCompleteIntent(item) {
-				return this.isApprovedIntent(item) && !this.isFinalIntent(item)
+				return this.activeTab === 'sellerIntents' && this.isApprovedIntent(item) && !this.isFinalIntent(item)
 			},
 			canCancelIntent(item) {
-				return !this.isFinalIntent(item)
+				return this.activeTab === 'buyerIntents' && !this.isFinalIntent(item)
 			},
 			async updateIntentStatus(item, status) {
 				try {
@@ -666,7 +688,8 @@
 	}
 
 	.status-tag.offline,
-	.status-tag.cancelled {
+	.status-tag.cancelled,
+	.status-tag.rejected {
 		color: #6b7280;
 		background: #e5e7eb;
 	}
@@ -721,9 +744,15 @@
 		color: #ffffff;
 	}
 
-	.delete-btn {
+	.delete-btn,
+	.reject-btn {
 		background: #fff1f2;
 		color: #ef4444;
+	}
+
+	.sold-btn {
+		background: #fff7ed;
+		color: #c2410c;
 	}
 
 	.copy-btn {

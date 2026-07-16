@@ -2,7 +2,7 @@ const db = uniCloud.database()
 const intents = db.collection('intents')
 const products = db.collection('products')
 
-const allowedStatuses = ['待确认', '已同意', '已完成', '已取消']
+const allowedStatuses = ['待确认', '已同意', '已拒绝', '已完成', '已取消']
 const sellerContactVisibleStatuses = ['已同意', '已完成', '已联系']
 
 function ok(data, message = 'ok') {
@@ -62,7 +62,7 @@ function hideSellerContactForBuyer(intent) {
 }
 
 function isActiveIntent(intent) {
-	return intent && intent.status !== '已取消'
+	return intent && ['待确认', '待联系', '已同意', '已联系'].includes(intent.status)
 }
 
 module.exports = {
@@ -122,9 +122,14 @@ module.exports = {
 			const isBuyer = intent.buyer_id === userId
 			const isSeller = intent.seller_id === userId
 			if (!isBuyer && !isSeller) return fail('no permission', 403)
-			if (status === '已同意' && !isSeller) return fail('only seller can approve contact', 403)
+			if (['已同意', '已拒绝', '已完成'].includes(status) && !isSeller) return fail('only seller can update this status', 403)
+			if (status === '已取消' && !isBuyer) return fail('only buyer can cancel intent', 403)
+			if (['已完成', '已取消', '已拒绝'].includes(intent.status)) return fail('final intent cannot be changed', 400)
 
 			await intents.doc(id).update({ status, updated_at: Date.now() })
+			if (status === '已完成') {
+				await products.doc(intent.product_id).update({ status: '已售出', updated_at: Date.now() })
+			}
 			return ok({ _id: id, status }, 'updated')
 		} catch (error) {
 			return fail(`意向状态更新失败：${normalizeError(error)}`)

@@ -67,7 +67,7 @@
 		"status": {
 			"bsonType": "string",
 			"title": "意向状态",
-			"enum": ["待确认", "已同意", "已完成", "已取消"]
+			"enum": ["待确认", "已同意", "已拒绝", "已完成", "已取消"]
 		},
 		"created_at": {
 			"bsonType": "number",

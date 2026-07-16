@@ -70,7 +70,7 @@
 		"status": {
 			"bsonType": "string",
 			"title": "商品状态",
-			"enum": ["在售", "已下架", "已删除"]
+			"enum": ["在售", "已下架", "已售出", "已删除"]
 		},
 		"created_at": {
 			"bsonType": "number",

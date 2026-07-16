@@ -68,7 +68,7 @@
 			</view>
 
 			<view class="action-row">
-				<button class="ghost-btn" @click="toggleFavorite">{{ favored ? '已收藏' : '收藏' }}</button>
+				<button class="ghost-btn" :disabled="favoriteButtonDisabled" @click="toggleFavorite">{{ favoriteButtonText }}</button>
 				<button class="primary-btn contact-btn" :disabled="contactButtonDisabled" @click="toggleIntentPanel">{{ contactButtonText }}</button>
 			</view>
 
@@ -84,6 +84,17 @@
 
 <script>
 	import { favoriteApi, getCurrentUser, intentApi, productApi } from '@/common/api.js'
+	import { getDefaultProductById } from '@/common/default-products.js'
+
+	const onSale = '\u5728\u552e'
+	const sold = '\u5df2\u552e\u51fa'
+	const pending = '\u5f85\u786e\u8ba4'
+	const pendingOld = '\u5f85\u8054\u7cfb'
+	const approved = '\u5df2\u540c\u610f'
+	const approvedOld = '\u5df2\u8054\u7cfb'
+	const done = '\u5df2\u5b8c\u6210'
+	const cancelled = '\u5df2\u53d6\u6d88'
+	const rejected = '\u5df2\u62d2\u7edd'
 
 	export default {
 		data() {
@@ -97,181 +108,127 @@
 				showIntentPanel: false,
 				intentMessage: '',
 				submittingIntent: false,
-				flowSteps: ['提交意向', '卖家同意', '查看联系方式', '线下交易'],
+				flowSteps: ['\u63d0\u4ea4\u610f\u5411', '\u5356\u5bb6\u786e\u8ba4', '\u67e5\u770b\u8054\u7cfb\u65b9\u5f0f', '\u7ebf\u4e0b\u4ea4\u6613'],
 				defaultImage: 'https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/uni@2x.png'
 			}
 		},
 		computed: {
-			currentUser() {
-				return getCurrentUser()
-			},
-			isSeller() {
-				return this.currentUser && this.product && this.currentUser._id === this.product.seller_id
-			},
-			canViewSellerContact() {
-				return this.currentIntent && ['已同意', '已完成', '已联系'].includes(this.currentIntent.status)
-			},
+			currentUser() { return getCurrentUser() },
+			isLocalDemo() { return this.product && this.product.is_local },
+			isSeller() { return this.currentUser && this.product && this.currentUser._id === this.product.seller_id },
+			canViewSellerContact() { return this.currentIntent && [approved, done, approvedOld].includes(this.currentIntent.status) },
 			currentFlowIndex() {
 				if (!this.currentIntent) return -1
 				const status = this.displayIntentStatus(this.currentIntent.status)
-				if (status === '待确认') return 0
-				if (status === '已同意') return 2
-				if (status === '已完成') return 3
+				if ([pending, rejected, cancelled].includes(status)) return 0
+				if (status === approved) return 2
+				if (status === done) return 3
 				return 0
 			},
 			currentIntentDesc() {
 				if (!this.currentIntent) return ''
 				const status = this.displayIntentStatus(this.currentIntent.status)
 				const descMap = {
-					'待确认': '已提交申请，正在等待卖家同意。卖家同意前不会显示联系方式。',
-					'已同意': '卖家已同意联系，现在可以查看联系方式并线下沟通。',
-					'已完成': '这条交易意向已完成，可作为交易记录保留。',
-					'已取消': '这条交易意向已取消，若仍想购买可重新提交。'
+					[pending]: '\u5df2\u63d0\u4ea4\u7533\u8bf7\uff0c\u6b63\u5728\u7b49\u5f85\u5356\u5bb6\u786e\u8ba4\u3002\u5356\u5bb6\u540c\u610f\u524d\u4e0d\u4f1a\u663e\u793a\u8054\u7cfb\u65b9\u5f0f\u3002',
+					[approved]: '\u5356\u5bb6\u5df2\u540c\u610f\u8054\u7cfb\uff0c\u73b0\u5728\u53ef\u4ee5\u67e5\u770b\u8054\u7cfb\u65b9\u5f0f\u5e76\u7ebf\u4e0b\u6c9f\u901a\u3002',
+					[done]: '\u8fd9\u6761\u4ea4\u6613\u610f\u5411\u5df2\u5b8c\u6210\uff0c\u53ef\u4f5c\u4e3a\u4ea4\u6613\u8bb0\u5f55\u4fdd\u7559\u3002',
+					[cancelled]: '\u8fd9\u6761\u4ea4\u6613\u610f\u5411\u5df2\u53d6\u6d88\uff0c\u82e5\u4ecd\u60f3\u8d2d\u4e70\u53ef\u91cd\u65b0\u63d0\u4ea4\u3002',
+					[rejected]: '\u5356\u5bb6\u5df2\u62d2\u7edd\u672c\u6b21\u4ea4\u6613\u610f\u5411\uff0c\u53ef\u9009\u62e9\u5176\u4ed6\u5546\u54c1\u3002'
 				}
-				return descMap[status] || '交易意向状态已更新。'
+				return descMap[status] || '\u4ea4\u6613\u610f\u5411\u72b6\u6001\u5df2\u66f4\u65b0\u3002'
 			},
-			contactButtonDisabled() {
-				return !this.product || this.product.status !== '在售' || this.isSeller
-			},
+			favoriteButtonDisabled() { return this.isLocalDemo },
+			favoriteButtonText() { return this.isLocalDemo ? '\u9ed8\u8ba4\u5546\u54c1' : (this.favored ? '\u5df2\u6536\u85cf' : '\u6536\u85cf') },
+			contactButtonDisabled() { return !this.product || this.product.status !== onSale || this.isSeller || this.isLocalDemo },
 			contactButtonText() {
-				if (this.isSeller) return '自己发布的商品'
-				if (this.product && this.product.status !== '在售') return '商品已下架'
-				if (this.currentIntent) return '已提交意向'
-				return '联系卖家'
+				if (this.isLocalDemo) return '\u9ed8\u8ba4\u5546\u54c1\u4ec5\u5c55\u793a'
+				if (this.isSeller) return '\u81ea\u5df1\u53d1\u5e03\u7684\u5546\u54c1'
+				if (this.product && this.product.status === sold) return '\u5546\u54c1\u5df2\u552e\u51fa'
+				if (this.product && this.product.status !== onSale) return '\u5546\u54c1\u5df2\u4e0b\u67b6'
+				if (this.currentIntent) return '\u5df2\u63d0\u4ea4\u610f\u5411'
+				return '\u8054\u7cfb\u5356\u5bb6'
 			}
 		},
-		onLoad(options) {
-			this.id = options.id || ''
-			this.loadDetail()
-		},
+		onLoad(options) { this.id = options.id || ''; this.loadDetail() },
 		methods: {
 			async loadDetail() {
-				if (!this.id) {
-					this.errorMessage = '缺少商品ID'
-					return
-				}
+				if (!this.id) { this.errorMessage = '\u7f3a\u5c11\u5546\u54c1ID'; return }
 				this.loading = true
 				this.errorMessage = ''
 				try {
+					const localProduct = getDefaultProductById(this.id)
+					if (localProduct) {
+						this.product = localProduct
+						this.intentMessage = `\u4f60\u597d\uff0c\u6211\u5bf9\u300a${this.product.title}\u300b\u611f\u5174\u8da3\uff0c\u60f3\u8fdb\u4e00\u6b65\u4e86\u89e3\u4e00\u4e0b\u3002`
+						this.favored = false
+						this.currentIntent = null
+						return
+					}
 					const res = await productApi.detail(this.id)
-					if (res.code !== 0) throw new Error(res.message || '详情加载失败')
+					if (res.code !== 0) throw new Error(res.message || '\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25')
 					this.product = res.data
-					this.intentMessage = `你好，我对《${this.product.title}》感兴趣，想进一步了解一下。`
+					this.intentMessage = `\u4f60\u597d\uff0c\u6211\u5bf9\u300a${this.product.title}\u300b\u611f\u5174\u8da3\uff0c\u60f3\u8fdb\u4e00\u6b65\u4e86\u89e3\u4e00\u4e0b\u3002`
 					await this.loadUserState()
 				} catch (error) {
 					this.product = null
-					this.errorMessage = error.message || '详情加载失败'
+					this.errorMessage = error.message || '\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25'
 					uni.showToast({ title: this.errorMessage, icon: 'none' })
-				} finally {
-					this.loading = false
-				}
+				} finally { this.loading = false }
 			},
 			async loadUserState() {
 				const user = getCurrentUser()
 				this.favored = false
 				this.currentIntent = null
-				if (!user) return
-
+				if (!user || this.isLocalDemo) return
 				const favoriteRes = await favoriteApi.check(user._id, this.id)
-				if (favoriteRes.code !== 0) throw new Error(favoriteRes.message || '收藏状态加载失败')
+				if (favoriteRes.code !== 0) throw new Error(favoriteRes.message || '\u6536\u85cf\u72b6\u6001\u52a0\u8f7d\u5931\u8d25')
 				this.favored = !!favoriteRes.data
-
 				if (this.product && this.product.seller_id !== user._id) {
 					const intentRes = await intentApi.listBuyer(user._id)
-					if (intentRes.code !== 0) throw new Error(intentRes.message || '交易意向加载失败')
-					this.currentIntent = (intentRes.data || []).find(item => item.product_id === this.id && item.status !== '已取消') || null
+					if (intentRes.code !== 0) throw new Error(intentRes.message || '\u4ea4\u6613\u610f\u5411\u52a0\u8f7d\u5931\u8d25')
+					this.currentIntent = (intentRes.data || []).find(item => item.product_id === this.id && ![cancelled, rejected].includes(item.status)) || null
 				}
 			},
 			async toggleFavorite() {
+				if (this.isLocalDemo) { uni.showToast({ title: '\u9ed8\u8ba4\u5546\u54c1\u4ec5\u7528\u4e8e\u5c55\u793a', icon: 'none' }); return }
 				const user = getCurrentUser()
-				if (!user) {
-					uni.navigateTo({ url: '/pages/login/login' })
-					return
-				}
+				if (!user) { uni.navigateTo({ url: '/pages/login/login' }); return }
 				try {
 					let res
-					if (this.favored) {
-						res = await favoriteApi.remove(user._id, this.id)
-						if (res.code !== 0) throw new Error(res.message || '取消收藏失败')
-						this.favored = false
-					} else {
-						res = await favoriteApi.add(user._id, this.id)
-						if (res.code !== 0) throw new Error(res.message || '收藏失败')
-						this.favored = true
-					}
-					uni.showToast({ title: this.favored ? '已收藏' : '已取消', icon: 'none' })
-				} catch (error) {
-					uni.showToast({ title: error.message || '操作失败', icon: 'none' })
-				}
+					if (this.favored) { res = await favoriteApi.remove(user._id, this.id); if (res.code !== 0) throw new Error(res.message || '\u53d6\u6d88\u6536\u85cf\u5931\u8d25'); this.favored = false }
+					else { res = await favoriteApi.add(user._id, this.id); if (res.code !== 0) throw new Error(res.message || '\u6536\u85cf\u5931\u8d25'); this.favored = true }
+					uni.showToast({ title: this.favored ? '\u5df2\u6536\u85cf' : '\u5df2\u53d6\u6d88', icon: 'none' })
+				} catch (error) { uni.showToast({ title: error.message || '\u64cd\u4f5c\u5931\u8d25', icon: 'none' }) }
 			},
 			toggleIntentPanel() {
 				const user = getCurrentUser()
-				if (!user) {
-					uni.navigateTo({ url: '/pages/login/login' })
-					return
-				}
-				if (this.product && this.product.status !== '在售') {
-					uni.showToast({ title: '该商品已下架', icon: 'none' })
-					return
-				}
-				if (this.isSeller) {
-					uni.showToast({ title: '不能联系自己发布的商品', icon: 'none' })
-					return
-				}
-				if (this.currentIntent) {
-					uni.showToast({ title: this.currentIntentDesc, icon: 'none' })
-					return
-				}
+				if (!user) { uni.navigateTo({ url: '/pages/login/login' }); return }
+				if (this.isLocalDemo) { uni.showToast({ title: '\u9ed8\u8ba4\u5546\u54c1\u4e0d\u8fdb\u5165\u771f\u5b9e\u4ea4\u6613\u6d41\u7a0b', icon: 'none' }); return }
+				if (this.product && this.product.status !== onSale) { uni.showToast({ title: this.product.status === sold ? '\u8be5\u5546\u54c1\u5df2\u552e\u51fa' : '\u8be5\u5546\u54c1\u5df2\u4e0b\u67b6', icon: 'none' }); return }
+				if (this.isSeller) { uni.showToast({ title: '\u4e0d\u80fd\u8054\u7cfb\u81ea\u5df1\u53d1\u5e03\u7684\u5546\u54c1', icon: 'none' }); return }
+				if (this.currentIntent) { uni.showToast({ title: this.currentIntentDesc, icon: 'none' }); return }
 				this.showIntentPanel = !this.showIntentPanel
 			},
 			async submitIntent() {
 				const user = getCurrentUser()
-				if (!user) {
-					uni.navigateTo({ url: '/pages/login/login' })
-					return
-				}
+				if (!user) { uni.navigateTo({ url: '/pages/login/login' }); return }
 				this.submittingIntent = true
 				try {
-					const res = await intentApi.add({
-						product_id: this.id,
-						buyer_id: user._id,
-						buyer_name: user.username,
-						buyer_contact: user.phone || user.email || '',
-						message: this.intentMessage
-					})
-					if (res.code !== 0) throw new Error(res.message || '提交失败')
+					const res = await intentApi.add({ product_id: this.id, buyer_id: user._id, buyer_name: user.username, buyer_contact: user.phone || user.email || '', message: this.intentMessage })
+					if (res.code !== 0) throw new Error(res.message || '\u63d0\u4ea4\u5931\u8d25')
 					this.currentIntent = res.data || null
-					uni.showModal({
-						title: '意向已提交',
-						content: '请等待卖家同意。卖家同意后，你可以在“我的-我想买的”查看联系方式。',
-						showCancel: false
-					})
+					uni.showModal({ title: '\u610f\u5411\u5df2\u63d0\u4ea4', content: '\u8bf7\u7b49\u5f85\u5356\u5bb6\u540c\u610f\u3002\u5356\u5bb6\u540c\u610f\u540e\uff0c\u4f60\u53ef\u4ee5\u5728\u201c\u6211\u7684-\u6211\u60f3\u4e70\u7684\u201d\u67e5\u770b\u8054\u7cfb\u65b9\u5f0f\u3002', showCancel: false })
 					this.showIntentPanel = false
-				} catch (error) {
-					uni.showToast({ title: error.message || '提交失败', icon: 'none' })
-				} finally {
-					this.submittingIntent = false
-				}
+				} catch (error) { uni.showToast({ title: error.message || '\u63d0\u4ea4\u5931\u8d25', icon: 'none' }) }
+				finally { this.submittingIntent = false }
 			},
-			displayIntentStatus(status) {
-				if (status === '待联系') return '待确认'
-				if (status === '已联系') return '已同意'
-				return status || '待确认'
-			},
+			displayIntentStatus(status) { if (status === pendingOld) return pending; if (status === approvedOld) return approved; return status || pending },
 			intentStatusClass(item) {
 				const status = this.displayIntentStatus(item.status)
-				return {
-					pending: status === '待确认',
-					approved: status === '已同意',
-					done: status === '已完成',
-					cancelled: status === '已取消'
-				}
+				return { pending: status === pending, approved: status === approved, done: status === done, cancelled: status === cancelled, rejected: status === rejected }
 			},
 			copySellerContact() {
-				if (!this.canViewSellerContact || !this.currentIntent.seller_contact) {
-					uni.showToast({ title: '暂无联系方式', icon: 'none' })
-					return
-				}
+				if (!this.canViewSellerContact || !this.currentIntent.seller_contact) { uni.showToast({ title: '\u6682\u65e0\u8054\u7cfb\u65b9\u5f0f', icon: 'none' }); return }
 				uni.setClipboardData({ data: this.currentIntent.seller_contact })
 			}
 		}
@@ -534,7 +491,8 @@
 		background: #edf5ff;
 	}
 
-	.intent-status-tag.cancelled {
+	.intent-status-tag.cancelled,
+	.intent-status-tag.rejected {
 		color: #6b7280;
 		background: #e5e7eb;
 	}

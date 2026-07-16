@@ -1,64 +1,9 @@
 const db = uniCloud.database()
-const dbCmd = db.command
 const products = db.collection('products')
-
-const demoProducts = [
-	{
-		_id: 'demo-product-1',
-		title: '高等数学教材第七版',
-		description: '教材保存较好，少量笔记，适合期末复习和补课使用。',
-		price: 28,
-		category: '教材资料',
-		condition: '八成新',
-		image_url: '',
-		school_id: 'fj_minnan_science_technology_university',
-		school_name: '闽南科技学院',
-		seller_id: 'demo-user-1',
-		seller_name: '张三',
-		contact: '13800000001',
-		status: '在售',
-		created_at: Date.now() - 300000,
-		updated_at: Date.now() - 300000
-	},
-	{
-		_id: 'demo-product-2',
-		title: '罗技无线鼠标',
-		description: '宿舍闲置无线鼠标，功能正常，带接收器。',
-		price: 45,
-		category: '数码电子',
-		condition: '正常使用',
-		image_url: '',
-		school_id: 'fj_xiamen_university',
-		school_name: '厦门大学',
-		seller_id: 'demo-user-2',
-		seller_name: '李四',
-		contact: '13800000002',
-		status: '在售',
-		created_at: Date.now() - 200000,
-		updated_at: Date.now() - 200000
-	},
-	{
-		_id: 'demo-product-3',
-		title: '寝室折叠收纳箱',
-		description: '搬宿舍多出来的收纳箱，容量大，适合衣物整理。',
-		price: 18,
-		category: '生活用品',
-		condition: '九成新',
-		image_url: '',
-		school_id: 'bj_tsinghua_university',
-		school_name: '清华大学',
-		seller_id: 'demo-user-3',
-		seller_name: '王五',
-		contact: '13800000003',
-		status: '在售',
-		created_at: Date.now() - 100000,
-		updated_at: Date.now() - 100000
-	}
-]
 
 const allowedCategories = ['教材资料', '数码电子', '生活用品', '运动户外', '其他']
 const allowedConditions = ['全新', '九成新', '八成新', '正常使用', '有明显使用痕迹']
-const allowedStatuses = ['在售', '已下架', '已删除']
+const allowedStatuses = ['在售', '已下架', '已售出', '已删除']
 
 function ok(data, message = 'ok') {
 	return { code: 0, message, data }
@@ -72,25 +17,19 @@ function normalizeError(error) {
 	return error && error.message ? error.message : String(error)
 }
 
-function databaseSetupMessage(error) {
-	return `数据库集合 products 不可用，请先在 uniCloud 控制台手动创建 products 集合后重试。原始错误：${normalizeError(error)}`
+function friendlyDbMessage(error) {
+	return `云数据库暂时繁忙：${normalizeError(error)}`
 }
 
-async function ensureDemoProducts() {
-	const countRes = await products.count()
-	if (countRes.total > 0) return
-	for (const item of demoProducts) {
-		const payload = { ...item }
-		delete payload._id
-		await products.add(payload)
-	}
+function sortByCreatedAtDesc(list) {
+	return (list || []).sort((left, right) => (right.created_at || 0) - (left.created_at || 0))
 }
 
 function filterProducts(list, params = {}) {
 	const keyword = (params.keyword || '').trim().toLowerCase()
 	const category = (params.category || '').trim()
 	const schoolId = (params.school_id || '').trim()
-	return list.filter(item => {
+	return (list || []).filter(item => {
 		const matchedStatus = item.status === '在售'
 		const matchedCategory = !category || item.category === category
 		const matchedSchool = !schoolId || item.school_id === schoolId
@@ -106,9 +45,10 @@ function filterProducts(list, params = {}) {
 function sortMyProducts(list) {
 	const statusPriority = {
 		'在售': 0,
-		'已下架': 1
+		'已售出': 1,
+		'已下架': 2
 	}
-	return list.sort((left, right) => {
+	return (list || []).sort((left, right) => {
 		const leftPriority = statusPriority[left.status] === undefined ? 2 : statusPriority[left.status]
 		const rightPriority = statusPriority[right.status] === undefined ? 2 : statusPriority[right.status]
 		if (leftPriority !== rightPriority) return leftPriority - rightPriority
@@ -134,6 +74,7 @@ function validateProductData(data, partial = false) {
 }
 
 function buildCreatePayload(data) {
+	const now = Date.now()
 	return {
 		title: String(data.title).trim(),
 		description: String(data.description).trim(),
@@ -147,8 +88,8 @@ function buildCreatePayload(data) {
 		seller_name: data.seller_name,
 		contact: data.contact,
 		status: '在售',
-		created_at: Date.now(),
-		updated_at: Date.now()
+		created_at: data.created_at || now,
+		updated_at: now
 	}
 }
 
@@ -172,11 +113,10 @@ async function getSellerProduct(id, sellerId) {
 module.exports = {
 	async list(params = {}) {
 		try {
-			await ensureDemoProducts()
-			const res = await products.orderBy('created_at', 'desc').get()
-			return ok(filterProducts(res.data, params))
+			const res = await products.limit(100).get()
+			return ok(filterProducts(sortByCreatedAtDesc(res.data), params))
 		} catch (error) {
-			return ok(filterProducts(demoProducts, params), `使用演示商品数据：${databaseSetupMessage(error)}`)
+			return ok([], `商品读取暂时使用空列表：${friendlyDbMessage(error)}`)
 		}
 	},
 
@@ -187,9 +127,7 @@ module.exports = {
 			if (!res.data.length || res.data[0].status === '已删除') return fail('product not found', 404)
 			return ok(res.data[0])
 		} catch (error) {
-			const demo = demoProducts.find(item => item._id === id)
-			if (demo) return ok(demo, `使用演示商品详情：${databaseSetupMessage(error)}`)
-			return fail(`商品详情读取失败：${databaseSetupMessage(error)}`)
+			return fail(`商品详情读取失败：${friendlyDbMessage(error)}`)
 		}
 	},
 
@@ -201,7 +139,7 @@ module.exports = {
 			const res = await products.add(payload)
 			return ok({ _id: res.id, ...payload }, 'created')
 		} catch (error) {
-			return fail(`商品保存失败：${databaseSetupMessage(error)}`)
+			return fail(`商品保存失败：${friendlyDbMessage(error)}`)
 		}
 	},
 
@@ -216,7 +154,7 @@ module.exports = {
 			await products.doc(id).update(payload)
 			return ok({ _id: id, ...payload }, 'updated')
 		} catch (error) {
-			return fail(`商品更新失败：${databaseSetupMessage(error)}`)
+			return fail(`商品更新失败：${friendlyDbMessage(error)}`)
 		}
 	},
 
@@ -225,13 +163,22 @@ module.exports = {
 		try {
 			const product = await getSellerProduct(id, userId)
 			if (!product) return fail('only seller can remove this product', 403)
-			await products.doc(id).update({
-				status: '已下架',
-				updated_at: Date.now()
-			})
+			await products.doc(id).update({ status: '已下架', updated_at: Date.now() })
 			return ok({ _id: id }, 'removed')
 		} catch (error) {
-			return fail(`商品下架失败：${databaseSetupMessage(error)}`)
+			return fail(`商品下架失败：${friendlyDbMessage(error)}`)
+		}
+	},
+
+	async markSold(id, userId) {
+		if (!id || !userId) return fail('id and userId are required', 400)
+		try {
+			const product = await getSellerProduct(id, userId)
+			if (!product) return fail('only seller can mark this product sold', 403)
+			await products.doc(id).update({ status: '已售出', updated_at: Date.now() })
+			return ok({ _id: id }, 'sold')
+		} catch (error) {
+			return fail(`商品标记售出失败：${friendlyDbMessage(error)}`)
 		}
 	},
 
@@ -240,13 +187,10 @@ module.exports = {
 		try {
 			const product = await getSellerProduct(id, userId)
 			if (!product) return fail('only seller can delete this product', 403)
-			await products.doc(id).update({
-				status: '已删除',
-				updated_at: Date.now()
-			})
+			await products.doc(id).update({ status: '已删除', updated_at: Date.now() })
 			return ok({ _id: id }, 'deleted')
 		} catch (error) {
-			return fail(`商品删除失败：${databaseSetupMessage(error)}`)
+			return fail(`商品删除失败：${friendlyDbMessage(error)}`)
 		}
 	},
 
@@ -257,17 +201,16 @@ module.exports = {
 			const list = (res.data || []).filter(item => item.status !== '已删除')
 			return ok(sortMyProducts(list))
 		} catch (error) {
-			const fallbackList = demoProducts.filter(item => item.seller_id === userId && item.status !== '已删除')
-			return ok(sortMyProducts(fallbackList), `我的发布读取使用备用数据：${normalizeError(error)}`)
+			return ok([], `我的发布读取暂时使用空列表：${friendlyDbMessage(error)}`)
 		}
 	},
 
 	async health() {
-		const result = { count: null, add: null, get: null }
+		const result = { get: null, add: null }
 		try {
-			result.count = await products.count()
+			result.get = await products.limit(1).get()
 		} catch (error) {
-			result.count = normalizeError(error)
+			result.get = normalizeError(error)
 		}
 		try {
 			const payload = buildCreatePayload({
@@ -287,11 +230,6 @@ module.exports = {
 			result.add = await products.add(payload)
 		} catch (error) {
 			result.add = normalizeError(error)
-		}
-		try {
-			result.get = await products.limit(1).get()
-		} catch (error) {
-			result.get = normalizeError(error)
 		}
 		return ok(result)
 	}
