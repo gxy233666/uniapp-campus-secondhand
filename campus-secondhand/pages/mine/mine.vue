@@ -24,6 +24,16 @@
 			</view>
 		</scroll-view>
 
+		<view v-if="isIntentTab" class="intent-guide">
+			<view class="guide-title">{{ intentGuideTitle }}</view>
+			<view class="guide-flow">
+				<text>提交意向</text>
+				<text>卖家同意</text>
+				<text>查看联系方式</text>
+				<text>线下交易</text>
+			</view>
+		</view>
+
 		<view v-if="loading" class="empty loading-state">
 			<view class="loading-spinner"></view>
 			<text>加载中...</text>
@@ -47,15 +57,20 @@
 			>
 				<image class="product-image" :src="itemImage(item)" mode="aspectFill"></image>
 				<view class="product-main">
-					<view class="product-title">{{ itemTitle(item) }}</view>
+					<view class="product-title-row">
+						<view class="product-title">{{ itemTitle(item) }}</view>
+						<text v-if="isIntentTab" class="status-tag" :class="intentStatusClass(item)">{{ displayIntentStatus(item.status) }}</text>
+					</view>
 					<view class="product-meta">{{ itemMeta(item) }}</view>
 					<view class="status-line">
 						<text class="price">¥{{ itemPrice(item) }}</text>
 						<text v-if="activeTab === 'products'" class="status-tag" :class="{ offline: item.status !== '在售' }">{{ item.status }}</text>
-						<text v-if="isIntentTab" class="status-tag" :class="intentStatusClass(item)">{{ displayIntentStatus(item.status) }}</text>
 					</view>
-					<view v-if="isIntentTab" class="intent-message">留言：{{ item.message }}</view>
-					<view v-if="isIntentTab" class="contact-hint">{{ intentContactHint(item) }}</view>
+					<view v-if="isIntentTab" class="intent-summary">
+						<view class="intent-summary-title">{{ intentStageTitle(item) }}</view>
+						<view class="intent-message">留言：{{ item.message }}</view>
+						<view class="contact-hint">{{ intentContactHint(item) }}</view>
+					</view>
 				</view>
 
 				<view v-if="activeTab === 'products'" class="action-buttons">
@@ -66,7 +81,7 @@
 
 				<view v-if="isIntentTab" class="action-buttons">
 					<button class="action-btn copy-btn" @click.stop="copyIntentContact(item)">{{ copyButtonText(item) }}</button>
-					<button v-if="canApproveIntent(item)" class="action-btn status-btn" @click.stop="updateIntentStatus(item, '已同意')">同意联系</button>
+					<button v-if="canApproveIntent(item)" class="action-btn status-btn important-btn" @click.stop="updateIntentStatus(item, '已同意')">同意联系</button>
 					<button v-if="canCompleteIntent(item)" class="action-btn edit-btn" @click.stop="updateIntentStatus(item, '已完成')">完成</button>
 					<button v-if="canCancelIntent(item)" class="action-btn delete-btn" @click.stop="updateIntentStatus(item, '已取消')">取消</button>
 				</view>
@@ -102,6 +117,9 @@
 			},
 			isIntentTab() {
 				return this.activeTab === 'buyerIntents' || this.activeTab === 'sellerIntents'
+			},
+			intentGuideTitle() {
+				return this.activeTab === 'buyerIntents' ? '我的购买进度' : '买家申请处理'
 			},
 			currentList() {
 				if (this.activeTab === 'products') return this.myProducts
@@ -165,7 +183,14 @@
 					let res
 					if (this.activeTab === 'products') {
 						res = await productApi.myList(this.user._id)
-						if (res.code !== 0) throw new Error(res.message || '我的发布加载失败')
+						if (res.code !== 0) {
+							if (this.isResourceExhausted(res.message)) {
+								this.myProducts = []
+								uni.showToast({ title: '我的发布暂时读取失败，请稍后重试', icon: 'none' })
+								return
+							}
+							throw new Error(res.message || '我的发布加载失败')
+						}
 						this.myProducts = res.data || []
 					} else if (this.activeTab === 'favorites') {
 						res = await favoriteApi.list(this.user._id)
@@ -173,11 +198,25 @@
 						this.favorites = res.data || []
 					} else if (this.activeTab === 'buyerIntents') {
 						res = await intentApi.listBuyer(this.user._id)
-						if (res.code !== 0) throw new Error(res.message || '我想买的加载失败')
+						if (res.code !== 0) {
+							if (this.isResourceExhausted(res.message)) {
+								this.buyerIntents = []
+								uni.showToast({ title: '我想买的暂时读取失败，请稍后重试', icon: 'none' })
+								return
+							}
+							throw new Error(res.message || '我想买的加载失败')
+						}
 						this.buyerIntents = res.data || []
 					} else {
 						res = await intentApi.listSeller(this.user._id)
-						if (res.code !== 0) throw new Error(res.message || '收到意向加载失败')
+						if (res.code !== 0) {
+							if (this.isResourceExhausted(res.message)) {
+								this.sellerIntents = []
+								uni.showToast({ title: '收到意向暂时读取失败，请稍后重试', icon: 'none' })
+								return
+							}
+							throw new Error(res.message || '收到意向加载失败')
+						}
 						this.sellerIntents = res.data || []
 					}
 				} catch (error) {
@@ -235,6 +274,9 @@
 					}
 				})
 			},
+			isResourceExhausted(message = '') {
+				return String(message).includes('resource exhausted') || String(message).includes('资源')
+			},
 			displayIntentStatus(status) {
 				if (status === '待联系') return '待确认'
 				if (status === '已联系') return '已同意'
@@ -257,6 +299,17 @@
 					done: status === '已完成',
 					cancelled: status === '已取消'
 				}
+			},
+			intentStageTitle(item) {
+				const status = this.displayIntentStatus(item.status)
+				if (this.activeTab === 'sellerIntents' && status === '待确认') return '等待你处理：同意后买家才能看到联系方式'
+				const titleMap = {
+					'待确认': '等待卖家同意，联系方式暂不可见',
+					'已同意': '卖家已同意，可以开始线下沟通',
+					'已完成': '交易意向已完成',
+					'已取消': '交易意向已取消'
+				}
+				return titleMap[status] || '交易意向状态已更新'
 			},
 			intentContactHint(item) {
 				if (this.activeTab === 'buyerIntents') {
@@ -314,7 +367,8 @@
 
 	.card,
 	.profile-card,
-	.product-card {
+	.product-card,
+	.intent-guide {
 		background: #ffffff;
 		box-shadow: 0 8rpx 28rpx rgba(0, 0, 0, 0.04);
 	}
@@ -405,7 +459,7 @@
 
 	.tabs-scroll {
 		white-space: nowrap;
-		margin-bottom: 28rpx;
+		margin-bottom: 24rpx;
 	}
 
 	.tabs {
@@ -433,6 +487,34 @@
 		color: #ffffff;
 		font-weight: 700;
 		box-shadow: 0 4rpx 12rpx rgba(22,119,255,0.25);
+	}
+
+	.intent-guide {
+		border-radius: 24rpx;
+		padding: 24rpx;
+		margin-bottom: 24rpx;
+	}
+
+	.guide-title {
+		font-size: 28rpx;
+		font-weight: 700;
+		color: #1f2937;
+		margin-bottom: 16rpx;
+	}
+
+	.guide-flow {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 8rpx;
+	}
+
+	.guide-flow text {
+		font-size: 22rpx;
+		color: #1677ff;
+		background: #edf5ff;
+		border-radius: 12rpx;
+		padding: 10rpx 6rpx;
+		text-align: center;
 	}
 
 	.empty {
@@ -502,11 +584,18 @@
 		min-width: 0;
 	}
 
+	.product-title-row {
+		display: flex;
+		align-items: center;
+		gap: 12rpx;
+		margin-bottom: 8rpx;
+	}
+
 	.product-title {
+		flex: 1;
 		font-size: 30rpx;
 		font-weight: 700;
 		color: #1f2937;
-		margin-bottom: 8rpx;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -525,6 +614,21 @@
 		line-height: 36rpx;
 	}
 
+	.intent-summary {
+		margin-top: 12rpx;
+		background: #f9fafb;
+		border-radius: 16rpx;
+		padding: 14rpx 16rpx;
+	}
+
+	.intent-summary-title {
+		font-size: 25rpx;
+		font-weight: 700;
+		color: #1f2937;
+		margin-bottom: 8rpx;
+		line-height: 36rpx;
+	}
+
 	.intent-message {
 		color: #4b5563;
 		white-space: normal;
@@ -532,9 +636,7 @@
 
 	.contact-hint {
 		color: #6b7280;
-		background: #f9fafb;
-		border-radius: 12rpx;
-		padding: 8rpx 12rpx;
+		margin-bottom: 0;
 	}
 
 	.status-line {
@@ -560,6 +662,7 @@
 		border-radius: 10rpx;
 		color: #1677ff;
 		background: #edf5ff;
+		white-space: nowrap;
 	}
 
 	.status-tag.offline,
@@ -611,6 +714,11 @@
 	.status-btn {
 		background: #ecfdf5;
 		color: #047857;
+	}
+
+	.important-btn {
+		background: #1677ff;
+		color: #ffffff;
 	}
 
 	.delete-btn {

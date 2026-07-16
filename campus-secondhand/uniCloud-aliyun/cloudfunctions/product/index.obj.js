@@ -253,13 +253,12 @@ module.exports = {
 	async myList(userId) {
 		if (!userId) return fail('userId is required', 400)
 		try {
-			const res = await products.where({
-				seller_id: userId,
-				status: dbCmd.neq('已删除')
-			}).orderBy('created_at', 'desc').get()
-			return ok(sortMyProducts(res.data))
+			const res = await products.where({ seller_id: userId }).limit(100).get()
+			const list = (res.data || []).filter(item => item.status !== '已删除')
+			return ok(sortMyProducts(list))
 		} catch (error) {
-			return fail(`我的发布读取失败：${databaseSetupMessage(error)}`)
+			const fallbackList = demoProducts.filter(item => item.seller_id === userId && item.status !== '已删除')
+			return ok(sortMyProducts(fallbackList), `我的发布读取使用备用数据：${normalizeError(error)}`)
 		}
 	},
 

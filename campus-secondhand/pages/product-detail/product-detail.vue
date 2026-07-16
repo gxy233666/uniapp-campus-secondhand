@@ -41,14 +41,40 @@
 				</view>
 			</view>
 
+			<view class="card flow-card">
+				<view class="flow-head">
+					<text class="flow-title">交易流程</text>
+					<text class="flow-note">平台申请，线下交易</text>
+				</view>
+				<view class="flow-steps">
+					<view v-for="(step, index) in flowSteps" :key="step" class="flow-step" :class="{ active: index <= currentFlowIndex }">
+						<view class="step-dot">{{ index + 1 }}</view>
+						<text class="step-text">{{ step }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view v-if="currentIntent" class="card intent-status-card">
+				<view class="intent-status-head">
+					<text class="intent-status-title">我的交易意向</text>
+					<text class="intent-status-tag" :class="intentStatusClass(currentIntent)">{{ displayIntentStatus(currentIntent.status) }}</text>
+				</view>
+				<text class="intent-status-desc">{{ currentIntentDesc }}</text>
+				<view v-if="canViewSellerContact" class="contact-box">
+					<text class="contact-label">卖家联系方式</text>
+					<text class="contact-value">{{ currentIntent.seller_contact || '暂无' }}</text>
+					<button class="small-copy-btn" @click="copySellerContact">复制</button>
+				</view>
+			</view>
+
 			<view class="action-row">
 				<button class="ghost-btn" @click="toggleFavorite">{{ favored ? '已收藏' : '收藏' }}</button>
-				<button class="primary-btn contact-btn" :disabled="product.status !== '在售'" @click="toggleIntentPanel">联系卖家</button>
+				<button class="primary-btn contact-btn" :disabled="contactButtonDisabled" @click="toggleIntentPanel">{{ contactButtonText }}</button>
 			</view>
 
 			<view v-if="showIntentPanel" class="card intent-card">
 				<view class="intent-title">提交购买意向</view>
-				<view class="intent-tip">卖家同意后，你可以在“我的-我想买的”中查看并复制卖家联系方式，再进行线下沟通和交易。</view>
+				<view class="intent-tip">卖家同意后，你可以在“我的-我想买的”中查看并复制卖家联系方式。</view>
 				<textarea class="intent-textarea" v-model="intentMessage" maxlength="300" placeholder="给卖家留言，例如：你好，这件商品还在吗？"></textarea>
 				<button class="submit-intent-btn" :disabled="submittingIntent" @click="submitIntent">{{ submittingIntent ? '提交中...' : '提交意向' }}</button>
 			</view>
@@ -65,12 +91,53 @@
 				id: '',
 				product: null,
 				favored: false,
+				currentIntent: null,
 				loading: false,
 				errorMessage: '',
 				showIntentPanel: false,
 				intentMessage: '',
 				submittingIntent: false,
+				flowSteps: ['提交意向', '卖家同意', '查看联系方式', '线下交易'],
 				defaultImage: 'https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/uni@2x.png'
+			}
+		},
+		computed: {
+			currentUser() {
+				return getCurrentUser()
+			},
+			isSeller() {
+				return this.currentUser && this.product && this.currentUser._id === this.product.seller_id
+			},
+			canViewSellerContact() {
+				return this.currentIntent && ['已同意', '已完成', '已联系'].includes(this.currentIntent.status)
+			},
+			currentFlowIndex() {
+				if (!this.currentIntent) return -1
+				const status = this.displayIntentStatus(this.currentIntent.status)
+				if (status === '待确认') return 0
+				if (status === '已同意') return 2
+				if (status === '已完成') return 3
+				return 0
+			},
+			currentIntentDesc() {
+				if (!this.currentIntent) return ''
+				const status = this.displayIntentStatus(this.currentIntent.status)
+				const descMap = {
+					'待确认': '已提交申请，正在等待卖家同意。卖家同意前不会显示联系方式。',
+					'已同意': '卖家已同意联系，现在可以查看联系方式并线下沟通。',
+					'已完成': '这条交易意向已完成，可作为交易记录保留。',
+					'已取消': '这条交易意向已取消，若仍想购买可重新提交。'
+				}
+				return descMap[status] || '交易意向状态已更新。'
+			},
+			contactButtonDisabled() {
+				return !this.product || this.product.status !== '在售' || this.isSeller
+			},
+			contactButtonText() {
+				if (this.isSeller) return '自己发布的商品'
+				if (this.product && this.product.status !== '在售') return '商品已下架'
+				if (this.currentIntent) return '已提交意向'
+				return '联系卖家'
 			}
 		},
 		onLoad(options) {
@@ -90,18 +157,29 @@
 					if (res.code !== 0) throw new Error(res.message || '详情加载失败')
 					this.product = res.data
 					this.intentMessage = `你好，我对《${this.product.title}》感兴趣，想进一步了解一下。`
-					const user = getCurrentUser()
-					if (user) {
-						const favoriteRes = await favoriteApi.check(user._id, this.id)
-						if (favoriteRes.code !== 0) throw new Error(favoriteRes.message || '收藏状态加载失败')
-						this.favored = !!favoriteRes.data
-					}
+					await this.loadUserState()
 				} catch (error) {
 					this.product = null
 					this.errorMessage = error.message || '详情加载失败'
 					uni.showToast({ title: this.errorMessage, icon: 'none' })
 				} finally {
 					this.loading = false
+				}
+			},
+			async loadUserState() {
+				const user = getCurrentUser()
+				this.favored = false
+				this.currentIntent = null
+				if (!user) return
+
+				const favoriteRes = await favoriteApi.check(user._id, this.id)
+				if (favoriteRes.code !== 0) throw new Error(favoriteRes.message || '收藏状态加载失败')
+				this.favored = !!favoriteRes.data
+
+				if (this.product && this.product.seller_id !== user._id) {
+					const intentRes = await intentApi.listBuyer(user._id)
+					if (intentRes.code !== 0) throw new Error(intentRes.message || '交易意向加载失败')
+					this.currentIntent = (intentRes.data || []).find(item => item.product_id === this.id && item.status !== '已取消') || null
 				}
 			},
 			async toggleFavorite() {
@@ -136,8 +214,12 @@
 					uni.showToast({ title: '该商品已下架', icon: 'none' })
 					return
 				}
-				if (this.product && this.product.seller_id === user._id) {
+				if (this.isSeller) {
 					uni.showToast({ title: '不能联系自己发布的商品', icon: 'none' })
+					return
+				}
+				if (this.currentIntent) {
+					uni.showToast({ title: this.currentIntentDesc, icon: 'none' })
 					return
 				}
 				this.showIntentPanel = !this.showIntentPanel
@@ -158,6 +240,7 @@
 						message: this.intentMessage
 					})
 					if (res.code !== 0) throw new Error(res.message || '提交失败')
+					this.currentIntent = res.data || null
 					uni.showModal({
 						title: '意向已提交',
 						content: '请等待卖家同意。卖家同意后，你可以在“我的-我想买的”查看联系方式。',
@@ -169,6 +252,27 @@
 				} finally {
 					this.submittingIntent = false
 				}
+			},
+			displayIntentStatus(status) {
+				if (status === '待联系') return '待确认'
+				if (status === '已联系') return '已同意'
+				return status || '待确认'
+			},
+			intentStatusClass(item) {
+				const status = this.displayIntentStatus(item.status)
+				return {
+					pending: status === '待确认',
+					approved: status === '已同意',
+					done: status === '已完成',
+					cancelled: status === '已取消'
+				}
+			},
+			copySellerContact() {
+				if (!this.canViewSellerContact || !this.currentIntent.seller_contact) {
+					uni.showToast({ title: '暂无联系方式', icon: 'none' })
+					return
+				}
+				uni.setClipboardData({ data: this.currentIntent.seller_contact })
 			}
 		}
 	}
@@ -250,11 +354,19 @@
 	}
 
 	.detail-card,
+	.flow-card,
+	.intent-status-card,
 	.intent-card {
 		background: #ffffff;
 		border-radius: 32rpx;
 		padding: 36rpx 28rpx;
 		box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.06);
+	}
+
+	.flow-card,
+	.intent-status-card,
+	.intent-card {
+		margin-top: 24rpx;
 	}
 
 	.title {
@@ -340,6 +452,136 @@
 		color: #6b7280;
 	}
 
+	.flow-head,
+	.intent-status-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 20rpx;
+		margin-bottom: 24rpx;
+	}
+
+	.flow-title,
+	.intent-status-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1f2937;
+	}
+
+	.flow-note {
+		font-size: 24rpx;
+		color: #6b7280;
+	}
+
+	.flow-steps {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 10rpx;
+	}
+
+	.flow-step {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10rpx;
+		color: #9ca3af;
+		font-size: 22rpx;
+		text-align: center;
+	}
+
+	.step-dot {
+		width: 44rpx;
+		height: 44rpx;
+		line-height: 44rpx;
+		border-radius: 50%;
+		background: #e5e7eb;
+		color: #6b7280;
+		font-size: 22rpx;
+		font-weight: 700;
+	}
+
+	.flow-step.active {
+		color: #1677ff;
+		font-weight: 600;
+	}
+
+	.flow-step.active .step-dot {
+		background: #1677ff;
+		color: #ffffff;
+	}
+
+	.intent-status-tag {
+		font-size: 24rpx;
+		font-weight: 700;
+		padding: 8rpx 18rpx;
+		border-radius: 16rpx;
+		color: #1677ff;
+		background: #edf5ff;
+	}
+
+	.intent-status-tag.pending {
+		color: #b45309;
+		background: #fffbeb;
+	}
+
+	.intent-status-tag.approved {
+		color: #047857;
+		background: #ecfdf5;
+	}
+
+	.intent-status-tag.done {
+		color: #1677ff;
+		background: #edf5ff;
+	}
+
+	.intent-status-tag.cancelled {
+		color: #6b7280;
+		background: #e5e7eb;
+	}
+
+	.intent-status-desc {
+		display: block;
+		font-size: 26rpx;
+		color: #4b5563;
+		line-height: 40rpx;
+	}
+
+	.contact-box {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: 8rpx 16rpx;
+		align-items: center;
+		margin-top: 20rpx;
+		padding: 18rpx 20rpx;
+		background: #f9fafb;
+		border-radius: 18rpx;
+	}
+
+	.contact-label {
+		font-size: 24rpx;
+		color: #6b7280;
+		grid-column: 1 / 2;
+	}
+
+	.contact-value {
+		font-size: 28rpx;
+		font-weight: 700;
+		color: #1f2937;
+		grid-column: 1 / 2;
+	}
+
+	.small-copy-btn {
+		grid-column: 2 / 3;
+		grid-row: 1 / 3;
+		width: 120rpx;
+		height: 64rpx;
+		line-height: 64rpx;
+		border-radius: 18rpx;
+		font-size: 24rpx;
+		background: #edf5ff;
+		color: #1677ff;
+	}
+
 	.action-row {
 		display: flex;
 		gap: 20rpx;
@@ -374,10 +616,6 @@
 	.contact-btn[disabled] {
 		background: #d1d5db;
 		color: #ffffff;
-	}
-
-	.intent-card {
-		margin-top: 24rpx;
 	}
 
 	.intent-title {

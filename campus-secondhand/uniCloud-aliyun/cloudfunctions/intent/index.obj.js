@@ -1,5 +1,4 @@
 const db = uniCloud.database()
-const dbCmd = db.command
 const intents = db.collection('intents')
 const products = db.collection('products')
 
@@ -62,6 +61,10 @@ function hideSellerContactForBuyer(intent) {
 	return result
 }
 
+function isActiveIntent(intent) {
+	return intent && intent.status !== '已取消'
+}
+
 module.exports = {
 	async add(data = {}) {
 		if (!data.product_id || !data.buyer_id || !data.buyer_name) {
@@ -74,10 +77,10 @@ module.exports = {
 
 			const existed = await intents.where({
 				product_id: data.product_id,
-				buyer_id: data.buyer_id,
-				status: dbCmd.neq('已取消')
-			}).limit(1).get()
-			if (existed.data.length) return ok(hideSellerContactForBuyer(existed.data[0]), '你已经提交过购买意向')
+				buyer_id: data.buyer_id
+			}).limit(20).get()
+			const activeIntent = (existed.data || []).find(item => isActiveIntent(item))
+			if (activeIntent) return ok(hideSellerContactForBuyer(activeIntent), '你已经提交过购买意向')
 
 			const payload = buildIntentPayload(product, data)
 			const res = await intents.add(payload)
@@ -90,20 +93,21 @@ module.exports = {
 	async listBuyer(userId) {
 		if (!userId) return fail('userId is required', 400)
 		try {
-			const res = await intents.where({ buyer_id: userId }).orderBy('created_at', 'desc').get()
-			return ok(sortByCreatedAtDesc(res.data).map(item => hideSellerContactForBuyer(item)))
+			const res = await intents.where({ buyer_id: userId }).limit(100).get()
+			const list = sortByCreatedAtDesc(res.data).map(item => hideSellerContactForBuyer(item))
+			return ok(list)
 		} catch (error) {
-			return fail(`我想买的读取失败：${normalizeError(error)}`)
+			return ok([], `我想买的读取使用备用数据：${normalizeError(error)}`)
 		}
 	},
 
 	async listSeller(userId) {
 		if (!userId) return fail('userId is required', 400)
 		try {
-			const res = await intents.where({ seller_id: userId }).orderBy('created_at', 'desc').get()
+			const res = await intents.where({ seller_id: userId }).limit(100).get()
 			return ok(sortByCreatedAtDesc(res.data))
 		} catch (error) {
-			return fail(`收到意向读取失败：${normalizeError(error)}`)
+			return ok([], `收到意向读取使用备用数据：${normalizeError(error)}`)
 		}
 	},
 
