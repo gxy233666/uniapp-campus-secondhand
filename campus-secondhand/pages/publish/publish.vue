@@ -1,7 +1,6 @@
 <template>
 	<view class="page">
 		<view class="card form-card">
-			<!-- 顶部标题装饰 -->
 			<view class="form-header">
 				<text class="header-icon">📦</text>
 				<view class="header-text">
@@ -10,25 +9,21 @@
 				</view>
 			</view>
 
-			<!-- 当前发布院校提示 -->
 			<view class="school-tip">
 				<text class="tip-icon">🎓</text>
 				<text>{{ userSchoolText }}</text>
 			</view>
 
-			<!-- 商品标题 -->
 			<view class="input-group">
 				<text class="input-label">商品标题</text>
 				<input class="field" v-model="form.title" placeholder="例如：全新高数教材下册" />
 			</view>
 
-			<!-- 描述 -->
 			<view class="input-group">
 				<text class="input-label">商品描述</text>
 				<textarea class="textarea" v-model="form.description" placeholder="描述购买时间、使用情况、交易地点等"></textarea>
 			</view>
 
-			<!-- 价格 -->
 			<view class="input-group">
 				<text class="input-label">价格</text>
 				<view class="price-wrapper">
@@ -37,44 +32,50 @@
 				</view>
 			</view>
 
-			<!-- 分类选择 -->
 			<view class="input-group">
 				<text class="input-label">商品分类</text>
 				<picker :range="categories" @change="onCategoryChange">
 					<view class="field picker-field">
 						<text :class="{ placeholder: !form.category }">{{ form.category || '请选择分类' }}</text>
-						<text class="picker-arrow">›</text>
+						<text class="picker-arrow">?</text>
 					</view>
 				</picker>
 			</view>
 
-			<!-- 成色选择 -->
 			<view class="input-group">
 				<text class="input-label">商品成色</text>
 				<picker :range="conditions" @change="onConditionChange">
 					<view class="field picker-field">
 						<text :class="{ placeholder: !form.condition }">{{ form.condition || '请选择成色' }}</text>
-						<text class="picker-arrow">›</text>
+						<text class="picker-arrow">?</text>
 					</view>
 				</picker>
 			</view>
 
-			<!-- 联系方式 -->
 			<view class="input-group">
 				<text class="input-label">联系方式</text>
 				<input class="field" v-model="form.contact" placeholder="手机号或微信号" />
 			</view>
 
-			<!-- 图片地址 -->
 			<view class="input-group">
-				<text class="input-label">图片链接</text>
-				<input class="field" v-model="form.image_url" placeholder="可先留空，后续补充图片地址" />
+				<text class="input-label">商品图片</text>
+				<view class="image-uploader" @click="chooseProductImage">
+					<image v-if="imagePreview" class="image-preview" :src="imagePreview" mode="aspectFill"></image>
+					<view v-else class="upload-placeholder">
+						<text class="upload-icon">+</text>
+						<text class="upload-text">{{ imageButtonText }}</text>
+					</view>
+					<view v-if="uploadingImage" class="upload-mask">{{ uploadMaskText }}</view>
+				</view>
+				<view class="image-actions">
+					<text class="image-tip">选择本地图片后会自动上传到 uniCloud 云存储</text>
+					<text v-if="imagePreview" class="remove-image" @click.stop="clearImage">移除</text>
+				</view>
 			</view>
 
-			<!-- 发布按钮 -->
-			<button class="primary-btn submit-btn" @click="submit">
+			<button class="primary-btn submit-btn" :disabled="uploadingImage || submitting" @click="submit">
 				<text class="btn-icon">✨</text>
-				<text>立即发布</text>
+				<text>{{ submitButtonText }}</text>
 			</button>
 		</view>
 	</view>
@@ -96,7 +97,10 @@
 					condition: '',
 					contact: '',
 					image_url: ''
-				}
+				},
+				imagePreview: '',
+				uploadingImage: false,
+				submitting: false
 			}
 		},
 		computed: {
@@ -106,14 +110,81 @@
 			userSchoolText() {
 				if (!this.currentUser) return '请先登录账号后发布商品'
 				return this.currentUser.school_name ? `${this.currentUser.school_name}` : '当前账号未绑定院校'
+			},
+			imageButtonText() {
+				return this.uploadingImage ? '上传中...' : '选择图片'
+			},
+			uploadMaskText() {
+				return '上传中...'
+			},
+			submitButtonText() {
+				if (this.uploadingImage) return '图片上传中...'
+				return this.submitting ? '发布中...' : '立即发布'
 			}
 		},
 		methods: {
+			createEmptyForm() {
+				return {
+					title: '',
+					description: '',
+					price: '',
+					category: '',
+					condition: '',
+					contact: '',
+					image_url: ''
+				}
+			},
 			onCategoryChange(event) {
 				this.form.category = this.categories[event.detail.value]
 			},
 			onConditionChange(event) {
 				this.form.condition = this.conditions[event.detail.value]
+			},
+			getImageExtension(filePath = '') {
+				const cleanPath = String(filePath).split('?')[0]
+				const matched = cleanPath.match(/\.([a-zA-Z0-9]+)$/)
+				return matched ? `.${matched[1].toLowerCase()}` : '.jpg'
+			},
+			chooseImageAsync() {
+				return new Promise((resolve, reject) => {
+					uni.chooseImage({
+						count: 1,
+						sizeType: ['compressed'],
+						sourceType: ['album', 'camera'],
+						success: resolve,
+						fail: reject
+					})
+				})
+			},
+			async chooseProductImage() {
+				if (this.uploadingImage) return
+				try {
+					const chooseRes = await this.chooseImageAsync()
+					const tempFilePath = chooseRes.tempFilePaths && chooseRes.tempFilePaths[0]
+					if (!tempFilePath) return
+
+					this.imagePreview = tempFilePath
+					this.uploadingImage = true
+					const ext = this.getImageExtension(tempFilePath)
+					const cloudPath = `product-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`
+					const uploadRes = await uniCloud.uploadFile({
+						filePath: tempFilePath,
+						cloudPath
+					})
+					if (!uploadRes.fileID) throw new Error('图片上传失败')
+					this.form.image_url = uploadRes.fileID
+					uni.showToast({ title: '图片上传成功', icon: 'success' })
+				} catch (error) {
+					if (error && error.errMsg && error.errMsg.includes('cancel')) return
+					this.form.image_url = ''
+					uni.showModal({ title: '图片上传失败', content: error.message || error.errMsg || '请重试', showCancel: false })
+				} finally {
+					this.uploadingImage = false
+				}
+			},
+			clearImage() {
+				this.imagePreview = ''
+				this.form.image_url = ''
 			},
 			validate() {
 				if (!this.form.title || !this.form.description || !this.form.price || !this.form.category || !this.form.contact) {
@@ -122,7 +193,15 @@
 				}
 				return true
 			},
+			resetForm() {
+				this.form = this.createEmptyForm()
+				this.imagePreview = ''
+			},
 			async submit() {
+				if (this.uploadingImage) {
+					uni.showToast({ title: '图片上传中，请稍后', icon: 'none' })
+					return
+				}
 				if (!this.validate()) return
 				const user = getCurrentUser()
 				if (!user) {
@@ -133,6 +212,7 @@
 					uni.showModal({ title: '无法发布', content: '当前账号没有院校信息，请注册新账号或切换到已选择院校的账号。', showCancel: false })
 					return
 				}
+				this.submitting = true
 				try {
 					const res = await productApi.add({
 						...this.form,
@@ -142,22 +222,14 @@
 						seller_id: user._id,
 						seller_name: user.username
 					})
-					if (res.code !== 0) {
-						throw new Error(res.message || '发布失败')
-					}
+					if (res.code !== 0) throw new Error(res.message || '发布失败')
 					uni.showToast({ title: '发布成功', icon: 'success' })
-					this.form = {
-						title: '',
-						description: '',
-						price: '',
-						category: '',
-						condition: '',
-						contact: '',
-						image_url: ''
-					}
+					this.resetForm()
 					setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 600)
 				} catch (error) {
 					uni.showModal({ title: '发布失败', content: error.message || '发布失败', showCancel: false })
+				} finally {
+					this.submitting = false
 				}
 			}
 		}
@@ -165,7 +237,6 @@
 </script>
 
 <style>
-	/* 全局页面背景 */
 	.page {
 		background: linear-gradient(160deg, #f0f4ff 0%, #e9f0fa 100%);
 		min-height: 100vh;
@@ -173,7 +244,6 @@
 		box-sizing: border-box;
 	}
 
-	/* 卡片样式 */
 	.form-card {
 		background: #ffffff;
 		border-radius: 32rpx;
@@ -181,7 +251,6 @@
 		box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.06);
 	}
 
-	/* 顶部标题区域 */
 	.form-header {
 		display: flex;
 		align-items: center;
@@ -218,7 +287,6 @@
 		margin-top: 4rpx;
 	}
 
-	/* 院校提示 */
 	.school-tip {
 		background: #edf5ff;
 		border-radius: 16rpx;
@@ -237,7 +305,6 @@
 		font-size: 28rpx;
 	}
 
-	/* 输入组 */
 	.input-group {
 		margin-bottom: 28rpx;
 	}
@@ -250,7 +317,6 @@
 		display: block;
 	}
 
-	/* 通用输入框样式 */
 	.field {
 		width: 100%;
 		height: 86rpx;
@@ -261,16 +327,8 @@
 		box-sizing: border-box;
 		font-size: 28rpx;
 		border: 1rpx solid #f3f4f6;
-		transition: all 0.2s;
 	}
 
-	.field:focus {
-		background: #ffffff;
-		border-color: #1677ff;
-		box-shadow: 0 0 0 4rpx rgba(22, 119, 255, 0.1);
-	}
-
-	/* 文本域 */
 	.textarea {
 		width: 100%;
 		height: 180rpx;
@@ -283,12 +341,6 @@
 		border: 1rpx solid #f3f4f6;
 	}
 
-	.textarea:focus {
-		background: #ffffff;
-		border-color: #1677ff;
-	}
-
-	/* 价格输入特殊样式 */
 	.price-wrapper {
 		display: flex;
 		align-items: center;
@@ -313,7 +365,6 @@
 		padding-left: 0;
 	}
 
-	/* picker 显示字段 */
 	.picker-field {
 		display: flex;
 		align-items: center;
@@ -328,11 +379,88 @@
 	.picker-arrow {
 		font-size: 32rpx;
 		color: #cbd5e1;
-		transform: rotate(0deg);
 		font-weight: 300;
 	}
 
-	/* 发布按钮 */
+	.image-uploader {
+		position: relative;
+		width: 100%;
+		height: 320rpx;
+		border-radius: 24rpx;
+		background: #f9fafb;
+		border: 2rpx dashed #cbd5e1;
+		overflow: hidden;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.image-preview {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	.upload-placeholder {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12rpx;
+		color: #64748b;
+	}
+
+	.upload-icon {
+		width: 72rpx;
+		height: 72rpx;
+		line-height: 68rpx;
+		text-align: center;
+		border-radius: 50%;
+		background: #edf5ff;
+		color: #1677ff;
+		font-size: 52rpx;
+		font-weight: 300;
+	}
+
+	.upload-text {
+		font-size: 26rpx;
+		font-weight: 600;
+	}
+
+	.upload-mask {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(17, 24, 39, 0.52);
+		color: #ffffff;
+		font-size: 28rpx;
+		font-weight: 700;
+	}
+
+	.image-actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 20rpx;
+		margin-top: 12rpx;
+	}
+
+	.image-tip {
+		flex: 1;
+		font-size: 23rpx;
+		line-height: 34rpx;
+		color: #8a96a8;
+	}
+
+	.remove-image {
+		flex: 0 0 auto;
+		font-size: 24rpx;
+		font-weight: 700;
+		color: #ef4444;
+	}
+
 	.submit-btn {
 		margin-top: 20rpx;
 		height: 92rpx;
@@ -348,7 +476,11 @@
 		gap: 12rpx;
 		border: none;
 		box-shadow: 0 8rpx 24rpx rgba(22, 119, 255, 0.3);
-		transition: all 0.2s;
+	}
+
+	.submit-btn[disabled] {
+		background: #cbd5e1;
+		box-shadow: none;
 	}
 
 	.submit-btn:active {

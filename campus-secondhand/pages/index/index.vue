@@ -67,7 +67,6 @@
 			<view v-for="item in products" :key="item._id" class="product-card" @click="goDetail(item)">
 				<view class="image-wrap">
 					<image class="product-image" :src="item.image_url || defaultImage" mode="aspectFill"></image>
-					<text class="source-badge" :class="{ cloud: !item.is_local }">{{ item.is_local ? ui.defaultSource : ui.cloudSource }}</text>
 				</view>
 				<view class="product-info">
 					<view class="product-title">{{ item.title }}</view>
@@ -78,7 +77,7 @@
 					</view>
 					<view class="card-bottom">
 						<view>
-							<view class="price">?{{ item.price }}</view>
+							<view class="price">¥{{ item.price }}</view>
 							<view class="seller-line">{{ item.school_name }} ? {{ item.seller_name }}</view>
 						</view>
 						<view class="detail-arrow">{{ ui.detail }}</view>
@@ -258,8 +257,6 @@ page { background: #f4f6fb; }
 .product-card { min-width: 0; overflow: hidden; border-radius: 24rpx; background: #ffffff; box-shadow: 0 12rpx 30rpx rgba(28, 54, 95, 0.08); }
 .image-wrap { position: relative; }
 .product-image { display: block; width: 100%; height: 230rpx; background: #edf2f7; }
-.source-badge { position: absolute; top: 14rpx; left: 14rpx; padding: 6rpx 12rpx; border-radius: 999rpx; background: rgba(17, 24, 39, 0.72); color: #ffffff; font-size: 20rpx; font-weight: 700; }
-.source-badge.cloud { background: rgba(22, 119, 255, 0.86); }
 .product-info { padding: 18rpx; }
 .product-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 29rpx; font-weight: 800; color: #111827; }
 .product-desc { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 64rpx; margin-top: 8rpx; font-size: 23rpx; line-height: 32rpx; color: #6b7280; }
