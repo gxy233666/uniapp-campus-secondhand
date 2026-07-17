@@ -27,6 +27,12 @@ H5 线上访问地址：
 
 [https://static-mp-28953f24-c8d9-4b4d-9b27-291085bf401a.next.bspapp.com/](https://static-mp-28953f24-c8d9-4b4d-9b27-291085bf401a.next.bspapp.com/)
 
+## 项目演示视频
+
+网盘链接：[校园二手平台演示视频](https://pan.baidu.com/s/1KcP9OLBFCAEko2NdkvImxQ?pwd=26xa)
+
+提取码：`26xa`
+
 ## 课程交付文档
 
 - [API 文档](docs/api.md)
