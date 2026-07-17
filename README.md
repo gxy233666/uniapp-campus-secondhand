@@ -39,7 +39,11 @@ H5 线上访问地址：
 - [AI Prompt 日志](docs/prompt_log.md)
 - [AI Code Review 报告](docs/code_review.md)
 - [AI Code Review 截图](docs/screenshots/code_review_report.png)
+- [云对象接口截图](docs/screenshots/api_cloudobjects.png)
+- [数据库集合截图](docs/screenshots/database_collections.png)
+- [云存储截图](docs/screenshots/cloud_storage.png)
 - [个人实训总结报告](docs/个人实训总结报告.docx)
+- [个人实训总结报告 Markdown](docs/个人实训总结报告.md)
 
 ## 技术栈
 
