@@ -78,7 +78,7 @@
 					<view class="card-bottom">
 						<view>
 							<view class="price">¥{{ item.price }}</view>
-							<view class="seller-line">{{ item.school_name }} ? {{ item.seller_name }}</view>
+							<view class="seller-line">{{ item.school_name }} / {{ item.seller_name }}</view>
 						</view>
 						<view class="detail-arrow">{{ ui.detail }}</view>
 					</view>
@@ -183,10 +183,10 @@ export default {
 				const res = await productApi.list({})
 				if (res.code !== 0) throw new Error(res.message || '\u4e91\u7aef\u5546\u54c1\u8bfb\u53d6\u5931\u8d25')
 				this.remoteProducts = (res.data || []).map((item) => this.normalizeRemoteProduct(item))
-				if (res.message && res.message !== 'ok') this.remoteMessage = res.message
+				if (res.message && res.message !== 'ok' && this.remoteProducts.length > 0) this.remoteMessage = res.message
 			} catch (error) {
 				this.remoteProducts = []
-				this.remoteMessage = `\u4e91\u7aef\u5546\u54c1\u6682\u65f6\u8bfb\u53d6\u5931\u8d25\uff0c\u5df2\u5148\u5c55\u793a\u9ed8\u8ba4\u5546\u54c1\uff1a${error.message || '\u672a\u77e5\u9519\u8bef'}`
+				this.remoteMessage = getDefaultProducts().length ? '' : '云端商品暂时读取失败，请稍后重试：' + (error.message || '未知错误')
 			} finally {
 				this.loadingRemote = false
 				this.applyFilters()

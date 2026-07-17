@@ -24,7 +24,7 @@ export function normalizeDefaultProduct(item) {
 		...item,
 		is_local: true,
 		source: 'default',
-		status: '??',
+		status: '在售',
 		seller_id: item.seller_id || `default-seller-${item._id}`,
 		contact: item.contact || ''
 	}
